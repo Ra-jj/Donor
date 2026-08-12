@@ -5,6 +5,7 @@ import { axiosInstance } from '../lib/axios';
 import { getSocket } from '../lib/socket';
 import toast from 'react-hot-toast';
 import ChatWindow from '../components/ChatWindow';
+import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart, ChatCircleDots } from '@phosphor-icons/react';
 
 const DashboardPage = () => {
   const { authUser } = useAuthStore();
@@ -43,7 +44,7 @@ const DashboardPage = () => {
     const handleNewRequest = (newRequestData) => {
       toast.success(
         <div>
-          <strong>Emergency Request!</strong>
+          <strong className="font-display text-lg tracking-tight">Emergency Request!</strong>
           <br/>
           {newRequestData.unitsNeeded} units of {newRequestData.bloodGroup} needed at {newRequestData.hospitalName}.
         </div>, 
@@ -95,55 +96,63 @@ const DashboardPage = () => {
 
   const UrgencyBadge = ({ urgency }) => {
     const colors = {
-      low: 'badge-success',
-      medium: 'badge-warning',
-      high: 'badge-error text-white font-bold'
+      low: 'bg-success/10 text-success border-success/20',
+      medium: 'bg-warning/10 text-warning-content border-warning/20',
+      high: 'bg-error/10 text-error border-error/20 font-bold'
     };
-    return <div className={`badge ${colors[urgency] || 'badge-ghost'}`}>{urgency.toUpperCase()}</div>;
+    return <div className={`badge border px-3 py-1 text-xs uppercase tracking-wider ${colors[urgency] || 'badge-ghost'}`}>{urgency}</div>;
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center p-12">
+      <div className="flex justify-center p-12 mt-12">
         <span className="loading loading-spinner loading-lg text-primary"></span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pt-6">
       {/* Header Profile Section */}
-      <div className="bg-base-100 rounded-xl p-6 shadow-sm border border-base-300 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Welcome, {authUser?.name || 'User'}</h1>
-          <p className="text-base-content/70">Blood Group: <strong className="text-red-500">{authUser?.bloodGroup || 'Not set'}</strong></p>
+      <div className="bg-base-100 rounded-3xl p-8 shadow-sm border border-base-300 flex flex-col sm:flex-row justify-between items-center gap-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+        <div className="z-10 relative">
+          <h1 className="text-3xl font-display font-extrabold text-base-content tracking-tight mb-1">Welcome, {authUser?.name || 'User'}</h1>
+          <p className="text-base-content/70 font-medium text-lg">Your Blood Group: <strong className="text-primary bg-primary/10 px-3 py-1 rounded-full ml-1">{authUser?.bloodGroup || 'Not set'}</strong></p>
         </div>
         
-        <div className="flex items-center gap-4">
-          <Link to="/create-request" className="btn btn-primary">
-            + Request Blood
+        <div className="flex items-center gap-4 z-10 relative w-full sm:w-auto">
+          <Link to="/create-request" className="btn btn-primary rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none w-full sm:w-auto">
+            <Plus weight="bold" className="w-5 h-5 mr-1" />
+            Request Blood
           </Link>
         </div>
       </div>
 
-        {/* Tabs */}
-        <div className="tabs tabs-boxed bg-base-100 border border-base-300 p-1 rounded-xl inline-flex mb-6">
+      {/* Tabs */}
+      <div className="flex justify-center sm:justify-start">
+        <div className="bg-base-100 border border-base-300 p-1.5 rounded-2xl inline-flex shadow-sm w-full sm:w-auto">
           <button 
-            className={`tab px-6 ${activeTab === 'incoming' ? 'tab-active bg-primary text-primary-content' : ''}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'incoming' ? 'bg-primary text-white shadow-md' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/50'}`}
             onClick={() => { setActiveTab('incoming'); setSelectedRequestId(null); }}
           >
+            <BellRinging weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5" />
             Incoming Matches
             {incomingRequests.filter(r => r.status === 'pending').length > 0 && (
-              <span className="badge badge-error badge-sm text-white ml-2">{incomingRequests.filter(r => r.status === 'pending').length}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ml-1 ${activeTab === 'incoming' ? 'bg-white text-primary' : 'bg-error text-white'}`}>
+                {incomingRequests.filter(r => r.status === 'pending').length}
+              </span>
             )}
           </button>
           <button 
-            className={`tab px-6 ${activeTab === 'mine' ? 'tab-active bg-primary text-primary-content' : ''}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'mine' ? 'bg-primary text-white shadow-md' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/50'}`}
             onClick={() => { setActiveTab('mine'); setSelectedRequestId(null); }}
           >
+            <ClockClockwise weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5" />
             My Requests
           </button>
         </div>
+      </div>
 
       {/* Tab Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

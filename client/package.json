@@ -10,13 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "axios": "^1.19.0",
     "daisyui": "^5.7.16",
-    "lucide-react": "^1.31.0",
+    "framer-motion": "^13.1.0",
     "oxlint": "^1.75.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

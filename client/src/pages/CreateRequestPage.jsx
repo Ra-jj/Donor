@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Building2, Droplet, Activity } from 'lucide-react';
+import { MapPin, BuildingOffice, Drop, Heartbeat } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
 
@@ -66,28 +66,28 @@ const CreateRequestPage = () => {
   };
 
   return (
-    <div className="flex justify-center items-center py-8">
-      <div className="card w-full max-w-lg bg-base-100 shadow-xl border border-base-300">
-        <div className="card-body">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-error/10 text-error rounded-full flex items-center justify-center mx-auto mb-4">
-              <Activity className="w-8 h-8" />
+    <div className="flex justify-center items-center py-12 px-4">
+      <div className="card w-full max-w-xl bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden">
+        <div className="card-body p-8 sm:p-10">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-primary/10 text-primary rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-primary/20">
+              <Heartbeat weight="duotone" className="w-10 h-10" />
             </div>
-            <h2 className="text-3xl font-bold text-primary">Request Blood</h2>
-            <p className="text-base-content/70 mt-2">Create an emergency broadcast. We will notify compatible donors within a 15km radius immediately.</p>
+            <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Request Blood</h2>
+            <p className="text-base-content/70 mt-3 font-medium leading-relaxed">Create an emergency broadcast. We will notify compatible donors within a 15km radius immediately.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             
             <div className="grid grid-cols-2 gap-4">
               <div className="form-control">
-                <label className="label"><span className="label-text font-medium">Blood Group Required</span></label>
+                <label className="label"><span className="label-text font-semibold text-base-content/80">Blood Group</span></label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Droplet className="h-5 w-5 text-error/60" />
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Drop weight="regular" className="h-5 w-5 text-primary/70" />
                   </div>
                   <select 
-                    className="select select-bordered w-full pl-10"
+                    className="select select-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
                     required
                     value={formData.bloodGroup}
                     onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
@@ -101,29 +101,48 @@ const CreateRequestPage = () => {
               </div>
 
               <div className="form-control">
-                <label className="label"><span className="label-text font-medium">Units Needed</span></label>
+                <label className="label"><span className="label-text font-semibold text-base-content/80">Units Needed</span></label>
                 <input 
                   type="number" 
-                  min="1"
-                  max="10"
-                  className="input input-bordered w-full" 
+                  min="1" 
+                  max="20"
+                  className="input input-bordered w-full rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium" 
                   required
                   value={formData.unitsNeeded}
-                  onChange={(e) => setFormData({ ...formData, unitsNeeded: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, unitsNeeded: e.target.value })}
                 />
               </div>
             </div>
 
             <div className="form-control">
-              <label className="label"><span className="label-text font-medium">Hospital Name</span></label>
+              <label className="label"><span className="label-text font-semibold text-base-content/80">Urgency Level</span></label>
+              <select 
+                className={`select select-bordered w-full rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium ${
+                  formData.urgency === 'high' ? 'bg-error/10 border-error text-error font-bold' :
+                  formData.urgency === 'medium' ? 'bg-warning/10 border-warning text-warning-content font-bold' :
+                  ''
+                }`}
+                value={formData.urgency}
+                onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
+              >
+                {URGENCY_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value} className="text-base-content font-medium">
+                    {level.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-semibold text-base-content/80">Hospital / Blood Bank Name</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building2 className="h-5 w-5 text-base-content/40" />
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <BuildingOffice weight="regular" className="h-5 w-5 text-base-content/40" />
                 </div>
                 <input 
                   type="text" 
-                  className="input input-bordered w-full pl-10" 
-                  placeholder="e.g. Apollo Gleneagles"
+                  className="input input-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  placeholder="e.g. City General Hospital"
                   required
                   value={formData.hospitalName}
                   onChange={(e) => setFormData({ ...formData, hospitalName: e.target.value })}
@@ -131,42 +150,26 @@ const CreateRequestPage = () => {
               </div>
             </div>
 
-            <div className="form-control">
-              <label className="label"><span className="label-text font-medium">Urgency Level</span></label>
-              <select 
-                className="select select-bordered w-full"
-                required
-                value={formData.urgency}
-                onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
-              >
-                {URGENCY_LEVELS.map((level) => (
-                  <option key={level.value} value={level.value}>{level.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-control mt-2 p-4 bg-base-200 rounded-lg border border-base-300">
-              <label className="label pt-0"><span className="label-text font-bold">Hospital Location</span></label>
-              <p className="text-xs text-base-content/60 mb-3">We need precise GPS coordinates to match you with the closest available donors.</p>
-              
+            <div className="form-control mt-2">
+              <label className="label"><span className="label-text font-semibold text-base-content/80">Hospital Location</span></label>
               <button 
                 type="button" 
-                className={`btn w-full ${formData.hospitalLocation ? 'btn-success text-white' : 'btn-outline'}`}
+                className={`btn w-full rounded-xl font-bold border-2 transition-all ${formData.hospitalLocation ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                 onClick={handleGetLocation}
               >
-                <MapPin className="w-5 h-5 mr-2" />
-                {formData.hospitalLocation ? 'Location Captured ✓' : 'Fetch GPS Coordinates'}
+                <MapPin weight={formData.hospitalLocation ? "fill" : "regular"} className="w-5 h-5 mr-2" />
+                {formData.hospitalLocation ? 'Location Captured ✓' : 'Click to Get Current Location'}
               </button>
               {formData.hospitalLocation && (
-                <span className="text-xs text-success mt-2 text-center block">
-                  [{formData.hospitalLocation[0].toFixed(4)}, {formData.hospitalLocation[1].toFixed(4)}]
+                <span className="text-xs font-semibold text-success mt-3 text-center block">
+                  Coordinates: {formData.hospitalLocation[0].toFixed(4)}, {formData.hospitalLocation[1].toFixed(4)}
                 </span>
               )}
             </div>
 
-            <div className="form-control mt-6">
-              <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-                {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency'}
+            <div className="form-control mt-8">
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg" disabled={loading}>
+                {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency Request'}
               </button>
             </div>
           </form>

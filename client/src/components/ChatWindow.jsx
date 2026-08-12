@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
+import { PaperPlaneRight, ChatCircleDots } from '@phosphor-icons/react';
 
 const ChatWindow = ({ requestId, currentUserId }) => {
   const [messages, setMessages] = useState([]);
@@ -81,31 +82,35 @@ const ChatWindow = ({ requestId, currentUserId }) => {
   };
 
   if (loading) {
-    return <div className="flex justify-center p-8"><span className="loading loading-spinner loading-md"></span></div>;
+    return <div className="flex justify-center p-8 mt-12"><span className="loading loading-spinner loading-lg text-primary"></span></div>;
   }
 
   return (
-    <div className="flex flex-col h-125 border border-base-300 rounded-xl bg-base-100 shadow-xl overflow-hidden">
+    <div className="flex flex-col h-125 border border-base-300 rounded-3xl bg-base-100 shadow-xl overflow-hidden shadow-base-content/5">
       {/* Header */}
-      <div className="bg-primary text-primary-content p-4 font-bold text-lg">
-        Request Coordination Chat
+      <div className="bg-primary/5 border-b border-primary/10 text-base-content p-4 font-bold flex items-center gap-3">
+        <div className="bg-primary/20 text-primary p-2 rounded-full">
+          <ChatCircleDots weight="fill" className="w-6 h-6" />
+        </div>
+        <span className="font-display text-lg tracking-tight">Request Coordination Chat</span>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-200">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-100/50">
         {messages.length === 0 ? (
-          <div className="text-center text-base-content/50 my-auto h-full flex items-center justify-center">
-            No messages yet. Send a message to coordinate!
+          <div className="text-center text-base-content/50 my-auto h-full flex flex-col items-center justify-center font-medium">
+            <ChatCircleDots weight="duotone" className="w-12 h-12 mb-3 text-base-content/20" />
+            No messages yet.<br/>Send a message to coordinate!
           </div>
         ) : (
           messages.map((msg) => {
             const isMe = msg.senderId === currentUserId;
             return (
               <div key={msg._id} className={`chat ${isMe ? 'chat-end' : 'chat-start'}`}>
-                <div className={`chat-bubble ${isMe ? 'chat-bubble-primary' : 'chat-bubble-secondary'}`}>
+                <div className={`chat-bubble font-medium shadow-sm ${isMe ? 'chat-bubble-primary text-white' : 'bg-base-200 text-base-content'}`}>
                   {msg.text}
                 </div>
-                <div className="chat-footer opacity-50 text-xs mt-1">
+                <div className="chat-footer opacity-60 text-xs mt-1 font-semibold">
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
@@ -116,16 +121,16 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       </div>
 
       {/* Input Area */}
-      <form onSubmit={handleSendMessage} className="p-4 bg-base-100 border-t border-base-300 flex gap-2">
+      <form onSubmit={handleSendMessage} className="p-4 bg-base-100 border-t border-base-200 flex gap-3">
         <input
           type="text"
           placeholder="Type your message..."
-          className="input input-bordered flex-1"
+          className="input input-bordered flex-1 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <button type="submit" className="btn btn-primary" disabled={!text.trim()}>
-          Send
+        <button type="submit" className="btn btn-primary btn-circle shadow-lg shadow-primary/20 border-none" disabled={!text.trim()}>
+          <PaperPlaneRight weight="fill" className="w-5 h-5 text-white" />
         </button>
       </form>
     </div>

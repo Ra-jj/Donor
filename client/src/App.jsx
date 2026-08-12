@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -31,17 +32,17 @@ function App() {
     <div className="min-h-screen bg-base-200 text-base-content font-sans">
       <Navbar />
       
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <main className="flex-1 w-full">
         <Routes>
-          <Route path="/" element={authUser ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
+          <Route path="/" element={authUser ? <Navigate to="/dashboard" /> : <HomePage />} />
           
-          <Route path="/register" element={!authUser ? <RegisterPage /> : <Navigate to="/dashboard" />} />
-          <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/dashboard" />} />
+          <Route path="/register" element={!authUser ? <div className="container mx-auto px-4 py-8 max-w-5xl"><RegisterPage /></div> : <Navigate to="/dashboard" />} />
+          <Route path="/login" element={!authUser ? <div className="container mx-auto px-4 py-8 max-w-5xl"><LoginPage /></div> : <Navigate to="/dashboard" />} />
           
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/create-request" element={<ProtectedRoute><CreateRequestPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><div className="container mx-auto px-4 py-8 max-w-5xl"><DashboardPage /></div></ProtectedRoute>} />
+          <Route path="/create-request" element={<ProtectedRoute><div className="container mx-auto px-4 py-8 max-w-5xl"><CreateRequestPage /></div></ProtectedRoute>} />
         </Routes>
-      </div>
+      </main>
 
       <Toaster position="top-center" />
     </div>
