@@ -13,11 +13,11 @@ export const initSocket = (userId) => {
   });
 
   socket.on('connect', () => {
-    console.log('Socket connected successfully:', socket.id);
+    // Socket connected
   });
 
   socket.on('disconnect', () => {
-    console.log('Socket disconnected');
+    // Socket disconnected
   });
 
   return socket;
