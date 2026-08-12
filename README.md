@@ -1,26 +1,29 @@
 # Donor Coordination Platform 🩸
 
-A real-time web application designed to connect hospitals in need of critical supplies/blood with willing donors. Built with a modern, fully-responsive MERN stack architecture and real-time WebSockets.
+A real-time web application designed to connect people in need of critical supplies and blood with willing donors nearby. Built with a modern, fully-responsive MERN stack architecture, real-time WebSockets, and geospatial queries.
 
 ## 🚀 Features
-- **Role-Based Dashboards:** Separate experiences for Hospitals (creating requests) and Donors (accepting requests).
-- **Real-Time Request Feeds:** See new donation requests instantly via Socket.io without refreshing.
-- **Coordination Chat:** Built-in real-time messaging between the hospital and the matched donor to coordinate drop-offs.
+- **Role-Based Workflows:** Seamless experiences for those creating requests and those stepping up to donate.
+- **Real-Time Request Feeds:** See new donation requests instantly via Socket.io without refreshing the page.
+- **Geolocation Matching:** Users provide their location, allowing the platform to calculate real-world distances and match donors with nearby emergencies.
+- **Coordination Chat:** Built-in real-time messaging between the requester and the matched donor to coordinate drop-offs.
 - **Urgency Tags:** Requests are tagged with Low, Medium, or High urgency for immediate prioritization.
-- **Modern UI:** Built with Tailwind CSS and DaisyUI for a beautiful, responsive, and accessible interface.
-- **Secure Authentication:** JWT-based authentication with HTTP-only cookies.
+- **Premium Custom UI:** A heavily customized, beautiful interface built with Tailwind CSS v4, Framer Motion animations, Phosphor Icons, and sleek typography (Space Grotesk + Inter).
+- **Secure Authentication:** JWT-based authentication with HTTP-only cookies, password hashing, and inline form validation.
 
 ## 🛠 Tech Stack
 **Frontend:**
 - React 19 (Vite)
 - Zustand (State Management)
-- Tailwind CSS & DaisyUI
+- Tailwind CSS v4 & DaisyUI
+- Framer Motion (Animations)
+- @phosphor-icons/react (Iconography)
 - React Router DOM
 - Socket.io Client
 
 **Backend:**
 - Node.js & Express 5
-- MongoDB & Mongoose
+- MongoDB & Mongoose (with 2dsphere indexing for geospatial queries)
 - Socket.io (WebSockets)
 - JWT (JSON Web Tokens)
 - Bcrypt (Password Hashing)
