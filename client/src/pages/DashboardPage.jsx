@@ -116,8 +116,10 @@ const DashboardPage = () => {
       {/* Header Profile Section */}
       <div className="bg-base-100 rounded-3xl p-8 shadow-sm border border-base-300 flex flex-col sm:flex-row justify-between items-center gap-6 overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-        <div className="z-10 relative">
-          <h1 className="text-3xl font-display font-extrabold text-base-content tracking-tight mb-1">Welcome, {authUser?.name || 'User'}</h1>
+        <div className="z-10 relative min-w-0 flex-1 w-full text-center sm:text-left">
+          <h1 className="text-3xl font-display font-extrabold text-base-content tracking-tight mb-1 truncate" title={`Welcome, ${authUser?.name || 'User'}`}>
+            Welcome, {authUser?.name || 'User'}
+          </h1>
           <p className="text-base-content/70 font-medium text-lg">Your Blood Group: <strong className="text-primary bg-primary/10 px-3 py-1 rounded-full ml-1">{authUser?.bloodGroup || 'Not set'}</strong></p>
         </div>
         

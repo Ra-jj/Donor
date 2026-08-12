@@ -111,7 +111,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
                   {msg.text}
                 </div>
                 <div className="chat-footer opacity-60 text-xs mt-1 font-semibold">
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </div>
               </div>
             );
@@ -125,7 +125,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
         <input
           type="text"
           placeholder="Type your message..."
-          className="input input-bordered flex-1 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
+          className="input w-full pl-4 rounded-2xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium flex-1"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />

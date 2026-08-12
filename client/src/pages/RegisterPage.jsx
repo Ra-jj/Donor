@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, User, EnvelopeSimple, Lock, Drop } from '@phosphor-icons/react';
+import { MapPin, User, EnvelopeSimple, Lock, Drop, Eye, EyeSlash } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,7 @@ const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const RegisterPage = () => {
   const { register } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,6 +17,16 @@ const RegisterPage = () => {
     bloodGroup: '',
     location: null, // [lng, lat]
   });
+
+  const [emailError, setEmailError] = useState('');
+
+  const handleEmailBlur = () => {
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setEmailError('Please enter a valid email address');
+    } else {
+      setEmailError('');
+    }
+  };
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -41,6 +52,10 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
     if (!formData.location) {
       toast.error('Please provide your location to help match you with nearby emergencies.');
       return;
@@ -68,7 +83,7 @@ const RegisterPage = () => {
                 </div>
                 <input 
                   type="text" 
-                  className="input input-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  className="input w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
                   placeholder="John Doe"
                   required
                   value={formData.name}
@@ -85,13 +100,18 @@ const RegisterPage = () => {
                 </div>
                 <input 
                   type="email" 
-                  className="input input-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  className={`input w-full pl-12 rounded-xl border ${emailError ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all`}
                   placeholder="you@example.com"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (emailError) setEmailError('');
+                  }}
+                  onBlur={handleEmailBlur}
                 />
               </div>
+              {emailError && <span className="text-error text-sm mt-1.5 ml-1 font-medium">{emailError}</span>}
             </div>
 
             <div className="form-control">
@@ -101,15 +121,23 @@ const RegisterPage = () => {
                   <Lock weight="regular" className="h-5 w-5 text-base-content/40" />
                 </div>
                 <input 
-                  type="password" 
-                  className="input input-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  type={showPassword ? "text" : "password"}
+                  className="input w-full pl-12 pr-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
                   placeholder="••••••••"
                   required
                   minLength={6}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
+                <button 
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/40 hover:text-primary transition-colors focus:outline-none"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
+                </button>
               </div>
+              <span className="text-base-content/60 text-sm mt-1.5 ml-1">At least 6 characters</span>
             </div>
 
             <div className="form-control">
@@ -119,7 +147,7 @@ const RegisterPage = () => {
                   <Drop weight="regular" className="h-5 w-5 text-primary/70" />
                 </div>
                 <select 
-                  className="select select-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
+                  className="select w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
                   required
                   value={formData.bloodGroup}
                   onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}

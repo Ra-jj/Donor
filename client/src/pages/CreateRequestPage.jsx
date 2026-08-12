@@ -87,7 +87,7 @@ const CreateRequestPage = () => {
                     <Drop weight="regular" className="h-5 w-5 text-primary/70" />
                   </div>
                   <select 
-                    className="select select-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
+                    className="select w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
                     required
                     value={formData.bloodGroup}
                     onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
@@ -106,7 +106,7 @@ const CreateRequestPage = () => {
                   type="number" 
                   min="1" 
                   max="20"
-                  className="input input-bordered w-full rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium" 
+                  className="input w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium" 
                   required
                   value={formData.unitsNeeded}
                   onChange={(e) => setFormData({ ...formData, unitsNeeded: e.target.value })}
@@ -117,7 +117,7 @@ const CreateRequestPage = () => {
             <div className="form-control">
               <label className="label"><span className="label-text font-semibold text-base-content/80">Urgency Level</span></label>
               <select 
-                className={`select select-bordered w-full rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium ${
+                className={`select w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium ${
                   formData.urgency === 'high' ? 'bg-error/10 border-error text-error font-bold' :
                   formData.urgency === 'medium' ? 'bg-warning/10 border-warning text-warning-content font-bold' :
                   ''
@@ -141,7 +141,7 @@ const CreateRequestPage = () => {
                 </div>
                 <input 
                   type="text" 
-                  className="input input-bordered w-full pl-12 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  className="input w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
                   placeholder="e.g. City General Hospital"
                   required
                   value={formData.hospitalName}

@@ -5,8 +5,8 @@
 
 /* We define a fully custom theme based on the user's requirements */
 @theme {
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
   
   /* Primary crimson brand color */
   --color-primary: #B91C1C;
@@ -24,19 +24,41 @@
   --color-info: #2563EB;
 }
 
-body {
-  margin: 0;
-  font-family: var(--font-body);
-  background-color: var(--color-base-100);
-  color: var(--color-base-content);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+@layer base {
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Space Grotesk", sans-serif;
+  }
+
+  /* Custom focus-visible to override default blue outline for buttons/links */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+@layer components {
+  /* Restore input/select borders and backgrounds, and force remove default outline */
+  .input, .select {
+    border: 1px solid var(--color-base-300);
+    background-color: var(--color-base-100);
+    outline: none !important;
+  }
+  
+  .input:focus, .select:focus,
+  .input:focus-within, .select:focus-within,
+  .input:focus-visible, .select:focus-visible {
+    outline: none !important;
+  }
 }
