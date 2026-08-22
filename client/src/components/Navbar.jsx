@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Drop, SignOut, List, X } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 const Navbar = () => {
   const { authUser, logout } = useAuthStore();

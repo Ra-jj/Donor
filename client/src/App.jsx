@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import { Toaster } from 'react-hot-toast';
+import { AnimatePresence, motion } from 'motion/react';
 
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -13,8 +14,22 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import CreateRequestPage from './pages/CreateRequestPage';
 
+// Animated page wrapper for smooth route transitions
+const PageTransition = ({ children, className = '' }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -8 }}
+    transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+);
+
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
+  const location = useLocation();
 
   useEffect(() => {
     checkAuth();
@@ -23,7 +38,13 @@ function App() {
   if (isCheckingAuth) {
     return (
       <div className="flex items-center justify-center h-screen bg-base-100">
-        <span className="loading loading-spinner loading-lg text-primary"></span>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <span className="loading loading-spinner loading-lg text-primary"></span>
+        </motion.div>
       </div>
     );
   }
@@ -33,15 +54,47 @@ function App() {
       <Navbar />
       
       <main className="flex-1 w-full">
-        <Routes>
-          <Route path="/" element={authUser ? <Navigate to="/dashboard" /> : <HomePage />} />
-          
-          <Route path="/register" element={!authUser ? <div className="container mx-auto px-4 py-8 max-w-5xl"><RegisterPage /></div> : <Navigate to="/dashboard" />} />
-          <Route path="/login" element={!authUser ? <div className="container mx-auto px-4 py-8 max-w-5xl"><LoginPage /></div> : <Navigate to="/dashboard" />} />
-          
-          <Route path="/dashboard" element={<ProtectedRoute><div className="container mx-auto px-4 py-8 max-w-5xl"><DashboardPage /></div></ProtectedRoute>} />
-          <Route path="/create-request" element={<ProtectedRoute><div className="container mx-auto px-4 py-8 max-w-5xl"><CreateRequestPage /></div></ProtectedRoute>} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={
+              authUser ? <Navigate to="/dashboard" /> : (
+                <PageTransition>
+                  <HomePage />
+                </PageTransition>
+              )
+            } />
+            
+            <Route path="/register" element={
+              !authUser ? (
+                <PageTransition className="container mx-auto px-4 py-8 max-w-5xl">
+                  <RegisterPage />
+                </PageTransition>
+              ) : <Navigate to="/dashboard" />
+            } />
+            <Route path="/login" element={
+              !authUser ? (
+                <PageTransition className="container mx-auto px-4 py-8 max-w-5xl">
+                  <LoginPage />
+                </PageTransition>
+              ) : <Navigate to="/dashboard" />
+            } />
+            
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <PageTransition className="container mx-auto px-4 py-8 max-w-5xl">
+                  <DashboardPage />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/create-request" element={
+              <ProtectedRoute>
+                <PageTransition className="container mx-auto px-4 py-8 max-w-5xl">
+                  <CreateRequestPage />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </AnimatePresence>
       </main>
 
       <Toaster position="top-center" />

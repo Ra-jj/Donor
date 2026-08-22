@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { EnvelopeSimple, Lock, SignIn, Eye, EyeSlash } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
+import { EnvelopeSimple, Lock, SignIn, Eye, EyeSlash, Drop } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 
 const LoginPage = () => {
@@ -34,20 +35,40 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex justify-center items-center h-[calc(100vh-4rem)] px-4">
-      <div className="card w-full max-w-md bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden">
+    <div className="flex justify-center items-center min-h-[calc(100vh-6rem)] px-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+        className="card w-full max-w-md bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden"
+      >
         <div className="card-body p-8 sm:p-10">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Welcome Back</h2>
-            <p className="text-base-content/70 mt-2 font-medium">Log in to Donor to continue.</p>
-          </div>
+          {/* Header */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className="text-center mb-8"
+          >
+            <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <Drop weight="duotone" className="w-7 h-7" />
+            </div>
+            <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Welcome back</h2>
+            <p className="text-base-content/50 mt-2 font-normal text-sm">Log in to your Donor account</p>
+          </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="form-control">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Email</span></label>
+            {/* Email */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              className="form-control"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Email</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <EnvelopeSimple weight="regular" className="h-5 w-5 text-base-content/40" />
+                  <EnvelopeSimple weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="email" 
@@ -62,14 +83,28 @@ const LoginPage = () => {
                   onBlur={handleEmailBlur}
                 />
               </div>
-              {emailError && <span className="text-error text-sm mt-1.5 ml-1 font-medium">{emailError}</span>}
-            </div>
+              {emailError && (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 ml-1 font-medium"
+                >
+                  {emailError}
+                </motion.span>
+              )}
+            </motion.div>
 
-            <div className="form-control">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Password</span></label>
+            {/* Password */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
+              className="form-control"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Password</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock weight="regular" className="h-5 w-5 text-base-content/40" />
+                  <Lock weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
@@ -81,16 +116,22 @@ const LoginPage = () => {
                 />
                 <button 
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/40 hover:text-primary transition-colors focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/30 hover:text-primary transition-colors focus:outline-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
                 </button>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="form-control mt-8">
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none" disabled={loading}>
+            {/* Submit */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              className="form-control mt-8"
+            >
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-12" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : (
                   <>
                     <SignIn weight="bold" className="w-5 h-5 mr-1" />
@@ -98,17 +139,22 @@ const LoginPage = () => {
                   </>
                 )}
               </button>
-            </div>
+            </motion.div>
           </form>
 
-          <div className="text-center mt-8">
-            <p className="text-base-content/70 font-medium">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            className="text-center mt-8"
+          >
+            <p className="text-base-content/50 text-sm font-medium">
               Don't have an account?{' '}
               <Link to="/register" className="text-primary font-bold hover:underline">Sign Up</Link>
             </p>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

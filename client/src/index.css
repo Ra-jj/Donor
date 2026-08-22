@@ -25,6 +25,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     margin: 0;
     font-family: var(--font-body);
@@ -61,4 +65,42 @@ code {
   .input:focus-visible, .select:focus-visible {
     outline: none !important;
   }
+
+  /* Glassmorphism utility — used sparingly for premium feel */
+  .glass-card {
+    background: rgba(250, 250, 249, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(231, 229, 228, 0.6);
+  }
+}
+
+@layer utilities {
+  /* Subtle glow for CTA buttons */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(185, 28, 28, 0.15), 0 0 60px rgba(185, 28, 28, 0.05);
+  }
+
+  /* Animated gradient background for CTA sections */
+  .bg-gradient-animated {
+    background: linear-gradient(135deg, #B91C1C 0%, #991B1B 50%, #7F1D1D 100%);
+    background-size: 200% 200%;
+    animation: gradient-shift 8s ease infinite;
+  }
+}
+
+/* Keyframes */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
 }

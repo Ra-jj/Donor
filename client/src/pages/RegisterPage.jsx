@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { MapPin, User, EnvelopeSimple, Lock, Drop, Eye, EyeSlash } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
@@ -65,21 +66,44 @@ const RegisterPage = () => {
     setLoading(false);
   };
 
+  // Stagger delay helper
+  const fieldDelay = (i) => ({ delay: 0.15 + i * 0.07, duration: 0.4 });
+
   return (
     <div className="flex justify-center items-center py-12 px-4">
-      <div className="card w-full max-w-md bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+        className="card w-full max-w-md bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden"
+      >
         <div className="card-body p-8 sm:p-10">
-          <div className="text-center mb-8">
+          {/* Header */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="text-center mb-8"
+          >
+            <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <Drop weight="duotone" className="w-7 h-7" />
+            </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Create Account</h2>
-            <p className="text-base-content/70 mt-2 font-medium">Join Donor and save lives today.</p>
-          </div>
+            <p className="text-base-content/50 mt-2 font-normal text-sm">Join Donor and start saving lives</p>
+          </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="form-control">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Full Name</span></label>
+            {/* Full Name */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(0)}
+              className="form-control"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Full Name</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User weight="regular" className="h-5 w-5 text-base-content/40" />
+                  <User weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="text" 
@@ -90,13 +114,19 @@ const RegisterPage = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
-            </div>
+            </motion.div>
 
-            <div className="form-control">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Email</span></label>
+            {/* Email */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(1)}
+              className="form-control"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Email</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <EnvelopeSimple weight="regular" className="h-5 w-5 text-base-content/40" />
+                  <EnvelopeSimple weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="email" 
@@ -111,14 +141,28 @@ const RegisterPage = () => {
                   onBlur={handleEmailBlur}
                 />
               </div>
-              {emailError && <span className="text-error text-sm mt-1.5 ml-1 font-medium">{emailError}</span>}
-            </div>
+              {emailError && (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 ml-1 font-medium"
+                >
+                  {emailError}
+                </motion.span>
+              )}
+            </motion.div>
 
-            <div className="form-control">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Password</span></label>
+            {/* Password */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(2)}
+              className="form-control"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Password</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock weight="regular" className="h-5 w-5 text-base-content/40" />
+                  <Lock weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
@@ -131,20 +175,26 @@ const RegisterPage = () => {
                 />
                 <button 
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/40 hover:text-primary transition-colors focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/30 hover:text-primary transition-colors focus:outline-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
                 </button>
               </div>
-              <span className="text-base-content/60 text-sm mt-1.5 ml-1">At least 6 characters</span>
-            </div>
+              <span className="text-base-content/40 text-xs mt-1.5 ml-1">At least 6 characters</span>
+            </motion.div>
 
-            <div className="form-control">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Blood Group</span></label>
+            {/* Blood Group */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(3)}
+              className="form-control"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Blood Group</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Drop weight="regular" className="h-5 w-5 text-primary/70" />
+                  <Drop weight="regular" className="h-5 w-5 text-primary/50" />
                 </div>
                 <select 
                   className="select w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
@@ -158,10 +208,16 @@ const RegisterPage = () => {
                   ))}
                 </select>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="form-control mt-2">
-              <label className="label"><span className="label-text font-semibold text-base-content/80">Location</span></label>
+            {/* Location */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(4)}
+              className="form-control mt-2"
+            >
+              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Location</span></label>
               <button 
                 type="button" 
                 className={`btn w-full rounded-xl font-bold border-2 transition-all ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
@@ -171,27 +227,42 @@ const RegisterPage = () => {
                 {formData.location ? 'Location Captured ✓' : 'Click to Get Current Location'}
               </button>
               {formData.location && (
-                <span className="text-xs font-semibold text-success mt-3 text-center">
+                <motion.span 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-xs font-semibold text-success mt-3 text-center"
+                >
                   Coordinates: {formData.location[0].toFixed(4)}, {formData.location[1].toFixed(4)}
-                </span>
+                </motion.span>
               )}
-            </div>
+            </motion.div>
 
-            <div className="form-control mt-8">
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none" disabled={loading}>
-                {loading ? <span className="loading loading-spinner"></span> : 'Sign Up'}
+            {/* Submit */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(5)}
+              className="form-control mt-8"
+            >
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-12" disabled={loading}>
+                {loading ? <span className="loading loading-spinner"></span> : 'Create Account'}
               </button>
-            </div>
+            </motion.div>
           </form>
 
-          <div className="text-center mt-8">
-            <p className="text-base-content/70 font-medium">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.65, duration: 0.4 }}
+            className="text-center mt-8"
+          >
+            <p className="text-base-content/50 text-sm font-medium">
               Already have an account?{' '}
               <Link to="/login" className="text-primary font-bold hover:underline">Log in</Link>
             </p>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
