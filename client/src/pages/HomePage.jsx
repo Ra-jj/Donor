@@ -307,19 +307,21 @@ const HomePage = () => {
           </motion.div>
 
           <div className="space-y-3 overflow-hidden">
-            {visibleActivities.map((activity, index) => (
+            {visibleActivities.map((activity, index) => {
+              const slideFrom = activity.uid % 2 === 0 ? -40 : 40;
+              return (
               <motion.div
                 key={activity.uid}
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: 'auto', marginBottom: 0 }}
-                transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+                initial={index === 0 ? { opacity: 0, x: slideFrom } : { opacity: 1, x: 0 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
               >
                 <ActivityRow 
                   activity={activity}
                   isNew={index === 0}
                 />
-              </motion.div>
-            ))}
+              </motion.div>);
+            })}
           </div>
         </div>
       </section>
