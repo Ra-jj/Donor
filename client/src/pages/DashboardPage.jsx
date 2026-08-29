@@ -83,6 +83,52 @@ const DashboardPage = () => {
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    if ('Notification' in window && navigator.serviceWorker) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          setPushEnabled(!!sub);
+        });
+      });
+    }
+  }, []);
+
+  const enablePushNotifications = async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        toast.error('Notifications permission denied');
+        return;
+      }
+      
+      const registration = await navigator.serviceWorker.ready;
+      
+      const urlBase64ToUint8Array = (base64String) => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY)
+      });
+
+      await axiosInstance.post('/push/subscribe', subscription);
+      setPushEnabled(true);
+      toast.success('Push notifications enabled!');
+    } catch (error) {
+      console.error('Error enabling push:', error);
+      toast.error('Failed to enable push notifications');
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -205,6 +251,26 @@ const DashboardPage = () => {
         </div>
       </motion.div>
 
+      {/* Push Notification Banner */}
+      {'Notification' in window && !pushEnabled && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-info/10 border border-info/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-info/20 p-2 rounded-full">
+              <BellRinging className="w-6 h-6 text-info" weight="duotone" />
+            </div>
+            <div>
+              <h3 className="font-bold text-info-content text-sm sm:text-base">Enable Push Notifications</h3>
+              <p className="text-xs sm:text-sm text-info-content/70">Get instantly alerted on your phone when an emergency matches your blood group.</p>
+            </div>
+          </div>
+          <button onClick={enablePushNotifications} className="btn btn-info btn-sm rounded-lg text-white font-semibold">Enable Now</button>
+        </motion.div>
+      )}
+
       {/* Tabs with animated indicator */}
       <div className="flex justify-center sm:justify-start">
         <div className="bg-base-100 border border-base-300 p-1.5 rounded-2xl inline-flex shadow-sm w-full sm:w-auto relative">
@@ -212,31 +278,27 @@ const DashboardPage = () => {
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'incoming' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
             onClick={() => { setActiveTab('incoming'); setSelectedRequestId(null); }}
           >
-            <BellRinging weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5" />
-            Incoming Matches
+            {activeTab === 'incoming' && (
+              <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
+            )}
             {incomingRequests.filter(r => r.status === 'pending').length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ml-1 ${activeTab === 'incoming' ? 'bg-white text-primary' : 'bg-error text-white'}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold mr-1 ${activeTab === 'incoming' ? 'bg-white text-primary' : 'bg-error text-white'}`}>
                 {incomingRequests.filter(r => r.status === 'pending').length}
               </span>
             )}
+            <BellRinging weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5" />
+            <span className="relative z-10">Incoming Matches</span>
           </button>
           <button 
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
             onClick={() => { setActiveTab('mine'); setSelectedRequestId(null); }}
           >
+            {activeTab === 'mine' && (
+              <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
+            )}
             <ClockClockwise weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5" />
-            My Requests
+            <span className="relative z-10">My Requests</span>
           </button>
-          {/* Animated tab indicator */}
-          <motion.div
-            layout
-            className="absolute top-1.5 bottom-1.5 rounded-xl bg-primary shadow-md"
-            style={{ width: 'calc(50% - 3px)' }}
-            animate={{ 
-              left: activeTab === 'incoming' ? '6px' : 'calc(50% - 0px)'
-            }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          />
         </div>
       </div>
 
@@ -256,8 +318,10 @@ const DashboardPage = () => {
               >
                 <h2 className="text-xl font-bold mb-4">Requests Needing Your Help</h2>
                 {incomingRequests.length === 0 ? (
-                  <div className="text-center p-8 bg-base-100 rounded-xl border border-base-300 text-base-content/60">
-                    No incoming requests right now. You're a hero in waiting!
+                  <div className="text-center p-12 bg-base-100 rounded-2xl border border-base-300 text-base-content/60 shadow-sm">
+                    <HandHeart weight="duotone" className="w-16 h-16 mx-auto mb-4 text-primary/40" />
+                    <h3 className="font-bold text-lg mb-1 text-base-content">You're all caught up!</h3>
+                    <p>There are no emergency requests near you right now.</p>
                   </div>
                 ) : (
                   <AnimatePresence>
@@ -282,7 +346,7 @@ const DashboardPage = () => {
                           <div className="card-actions justify-end mt-4">
                             {req.status === 'pending' ? (
                               <>
-                                <span className="text-xs text-base-content/30 font-medium self-center mr-2 hidden sm:inline">
+                                <span className="text-xs text-base-content/30 font-medium self-center mr-2 md:hidden">
                                   Swipe or tap →
                                 </span>
                                 <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-error">Decline</button>

@@ -2,4 +2,6 @@ node_modules/
 .env
 dist/
 build/
+dev-dist/
+scratch/
 .DS_Store

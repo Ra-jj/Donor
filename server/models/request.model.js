@@ -51,6 +51,10 @@ const requestSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    declinedBy: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    }],
   },
   { timestamps: true }
 );

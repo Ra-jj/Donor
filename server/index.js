@@ -6,6 +6,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth.route');
 const requestRoutes = require('./routes/request.route');
 const messageRoutes = require('./routes/message.route');
+const pushRoutes = require('./routes/push.route');
 const { app, server } = require('./lib/socket');
 
 const PORT = process.env.PORT || 8000;
@@ -17,6 +18,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/push', pushRoutes);
 
 const path = require('path');
 

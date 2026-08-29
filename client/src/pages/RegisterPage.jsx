@@ -218,14 +218,53 @@ const RegisterPage = () => {
               className="form-control mt-2"
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Location</span></label>
-              <button 
-                type="button" 
-                className={`btn w-full rounded-xl font-bold border-2 transition-all ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
-                onClick={handleGetLocation}
-              >
-                <MapPin weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
-                {formData.location ? 'Location Captured ✓' : 'Click to Get Current Location'}
-              </button>
+              <div className="flex flex-col gap-3">
+                <button 
+                  type="button" 
+                  className={`btn w-full rounded-xl font-bold border-2 transition-all ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                  onClick={handleGetLocation}
+                >
+                  <MapPin weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
+                  {formData.location ? 'Location Captured ✓' : 'Click to Get Current Location'}
+                </button>
+
+                <div className="divider text-xs text-base-content/40 my-0 uppercase">Or Enter Manually</div>
+
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    id="manual-location-input"
+                    placeholder="E.g. Kolkata, NY, etc." 
+                    className="input w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary rounded-xl font-bold"
+                    onClick={async () => {
+                      const query = document.getElementById('manual-location-input').value;
+                      if (!query) return toast.error('Please enter a city name');
+                      toast.loading('Searching...', { id: 'geoSearch' });
+                      try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                          setFormData({
+                            ...formData,
+                            location: [parseFloat(data[0].lon), parseFloat(data[0].lat)],
+                          });
+                          toast.success('Location found!', { id: 'geoSearch' });
+                        } else {
+                          toast.error('City not found. Try another.', { id: 'geoSearch' });
+                        }
+                      } catch (err) {
+                        toast.error('Failed to search location', { id: 'geoSearch' });
+                      }
+                    }}
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
               {formData.location && (
                 <motion.span 
                   initial={{ opacity: 0 }}

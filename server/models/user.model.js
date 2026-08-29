@@ -39,6 +39,10 @@ const userSchema = new mongoose.Schema(
         default: [0, 0],
       },
     },
+    pushSubscription: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     lastDonationDate: {
       type: Date,
       default: null,

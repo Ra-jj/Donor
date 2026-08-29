@@ -1,6 +1,16 @@
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { io } = require('../lib/socket');
+const webpush = require('web-push');
+
+// Configure web-push
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@donorapp.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 const RADIUS_KM = 15;
 const EARTH_RADIUS_KM = 6378.1;
@@ -44,14 +54,32 @@ exports.createRequest = async (req, res) => {
           $centerSphere: [hospitalLocation, radiusInRadians], // [ [lng, lat], radiusInRadians ]
         },
       },
-    }).select('_id name email location');
+    }).select('_id name email location pushSubscription');
 
-    // 3. Emit real-time socket events to matched donors
+    // 3. Emit real-time socket events and web push notifications to matched donors
     matchedDonors.forEach((donor) => {
       io.to(donor._id.toString()).emit('newBloodRequest', {
         ...newRequest.toObject(),
         requesterName: req.user.name,
       });
+
+      // Send Web Push Notification if the donor is subscribed
+      if (donor.pushSubscription) {
+        const payload = JSON.stringify({
+          title: '🚨 Emergency Blood Request!',
+          body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. Can you help?`,
+          icon: '/pwa-192x192.png',
+          data: { url: '/dashboard' }
+        });
+        
+        webpush.sendNotification(donor.pushSubscription, payload).catch((err) => {
+          console.error(`Failed to send web push to donor ${donor._id}:`, err.message);
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            // Subscription expired or invalid, remove it
+            User.findByIdAndUpdate(donor._id, { pushSubscription: null }).exec();
+          }
+        });
+      }
     });
 
     res.status(201).json({
@@ -88,6 +116,7 @@ exports.getIncomingRequests = async (req, res) => {
           status: 'pending',
           bloodGroup: donor.bloodGroup,
           requesterId: { $ne: donor._id },
+          declinedBy: { $ne: donor._id },
           hospitalLocation: {
             $geoWithin: {
               $centerSphere: [donor.location.coordinates, radiusInRadians],
@@ -131,7 +160,12 @@ exports.updateRequestStatus = async (req, res) => {
       
       // Update donor availability (optional based on preference, but good practice)
       await User.findByIdAndUpdate(req.user._id, { isAvailable: false });
-    } else if (status === 'declined' || status === 'cancelled' || status === 'fulfilled') {
+    } else if (status === 'declined') {
+      // Just hide it from this donor, don't change global status
+      request.declinedBy.push(req.user._id);
+      await request.save();
+      return res.status(200).json({ message: 'Request declined by you', request });
+    } else if (status === 'cancelled' || status === 'fulfilled') {
       // Just update the status if authorized (authorization logic can be more strict here)
       request.status = status;
     }
