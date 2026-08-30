@@ -2,6 +2,7 @@ const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { io } = require('../lib/socket');
 const webpush = require('web-push');
+const { getCompatibleDonorGroups, getCompatibleRecipientGroups } = require('../utils/bloodCompatibility');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -44,30 +45,37 @@ exports.createRequest = async (req, res) => {
     // IMPORTANT: $centerSphere takes radius in radians.
     // To convert km to radians, divide distance by Earth's radius (6378.1 km).
     const radiusInRadians = RADIUS_KM / EARTH_RADIUS_KM;
+    
+    // Find all donors whose blood group is compatible with the requested blood group
+    const compatibleDonorGroups = getCompatibleDonorGroups(bloodGroup);
 
     const matchedDonors = await User.find({
       _id: { $ne: requesterId }, // Exclude the requester themselves
-      bloodGroup: bloodGroup, // Exact match for MVP
+      bloodGroup: { $in: compatibleDonorGroups }, 
       isAvailable: true,
       location: {
         $geoWithin: {
           $centerSphere: [hospitalLocation, radiusInRadians], // [ [lng, lat], radiusInRadians ]
         },
       },
-    }).select('_id name email location pushSubscription');
+    }).select('_id name email location bloodGroup pushSubscription');
 
     // 3. Emit real-time socket events and web push notifications to matched donors
     matchedDonors.forEach((donor) => {
+      const isExactMatch = donor.bloodGroup === bloodGroup;
+      const matchType = isExactMatch ? 'exact' : 'compatible';
+
       io.to(donor._id.toString()).emit('newBloodRequest', {
         ...newRequest.toObject(),
         requesterName: req.user.name,
+        matchType,
       });
 
       // Send Web Push Notification if the donor is subscribed
       if (donor.pushSubscription) {
         const payload = JSON.stringify({
           title: '🚨 Emergency Blood Request!',
-          body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. Can you help?`,
+          body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
           icon: '/pwa-192x192.png',
           data: { url: '/dashboard' }
         });
@@ -108,13 +116,16 @@ exports.getIncomingRequests = async (req, res) => {
   try {
     const donor = req.user;
     const radiusInRadians = RADIUS_KM / EARTH_RADIUS_KM;
+    
+    // Get all recipient groups this donor is medically allowed to donate to
+    const compatibleRecipientGroups = getCompatibleRecipientGroups(donor.bloodGroup);
 
-    // Find pending requests nearby matching donor's blood group, OR requests this donor has already accepted
-    const incomingRequests = await Request.find({
+    // Find pending requests nearby matching compatible blood groups, OR requests this donor has already accepted
+    const rawIncomingRequests = await Request.find({
       $or: [
         {
           status: 'pending',
-          bloodGroup: donor.bloodGroup,
+          bloodGroup: { $in: compatibleRecipientGroups },
           requesterId: { $ne: donor._id },
           declinedBy: { $ne: donor._id },
           hospitalLocation: {
@@ -131,6 +142,15 @@ exports.getIncomingRequests = async (req, res) => {
     })
       .populate('requesterId', 'name profilePic')
       .sort({ createdAt: -1 });
+
+    // Inject matchType tag before sending to client
+    const incomingRequests = rawIncomingRequests.map(reqDoc => {
+      const reqObj = reqDoc.toObject();
+      if (reqObj.status === 'pending') {
+        reqObj.matchType = (reqObj.bloodGroup === donor.bloodGroup) ? 'exact' : 'compatible';
+      }
+      return reqObj;
+    });
 
     res.status(200).json({ incomingRequests });
   } catch (error) {

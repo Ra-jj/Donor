@@ -83,17 +83,7 @@ const DashboardPage = () => {
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
-  const [pushEnabled, setPushEnabled] = useState(false);
-
-  useEffect(() => {
-    if ('Notification' in window && navigator.serviceWorker) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
-          setPushEnabled(!!sub);
-        });
-      });
-    }
-  }, []);
+  const [pushEnabled, setPushEnabled] = useState(!!authUser?.pushSubscription);
 
   const enablePushNotifications = async () => {
     try {
@@ -227,7 +217,7 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="space-y-8 pt-6">
+    <div className="space-y-8 pt-20">
       {/* Header Profile Section */}
       <motion.div 
         initial={{ opacity: 0, y: 12 }}
@@ -263,8 +253,8 @@ const DashboardPage = () => {
               <BellRinging className="w-6 h-6 text-info" weight="duotone" />
             </div>
             <div>
-              <h3 className="font-bold text-info-content text-sm sm:text-base">Enable Push Notifications</h3>
-              <p className="text-xs sm:text-sm text-info-content/70">Get instantly alerted on your phone when an emergency matches your blood group.</p>
+              <h3 className="font-bold text-base-content text-sm sm:text-base">Enable Push Notifications</h3>
+              <p className="text-xs sm:text-sm text-base-content/70">Get instantly alerted on your phone when an emergency matches your blood group.</p>
             </div>
           </div>
           <button onClick={enablePushNotifications} className="btn btn-info btn-sm rounded-lg text-white font-semibold">Enable Now</button>
@@ -334,10 +324,17 @@ const DashboardPage = () => {
                         onSelect={setSelectedRequestId}
                         isSelected={selectedRequestId === req._id}
                       >
-                        <div className="card-body p-5">
-                          <div className="flex justify-between items-start">
-                            <h3 className="card-title text-lg">{req.hospitalName}</h3>
-                            <UrgencyBadge urgency={req.urgency} />
+                          <div className="card-body p-5">
+                          <div className="flex justify-between items-start gap-3">
+                            <h3 className="card-title text-lg flex-1 leading-snug">{req.hospitalName}</h3>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {req.matchType === 'exact' ? (
+                                <span className="badge badge-success badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-success/20">Exact Match</span>
+                              ) : req.matchType === 'compatible' ? (
+                                <span className="badge badge-info badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-info/20">Compatible Match</span>
+                              ) : null}
+                              <UrgencyBadge urgency={req.urgency} />
+                            </div>
                           </div>
                           <p className="text-sm text-base-content/70">
                             Needs: <strong>{req.unitsNeeded} units</strong> of {req.bloodGroup}

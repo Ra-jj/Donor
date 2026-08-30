@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -11,6 +11,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Prevent flash of wrong theme by reading localStorage before React mounts
+      try {
+        const stored = JSON.parse(localStorage.getItem('theme-storage'));
+        if (stored && stored.state && stored.state.theme) {
+          document.documentElement.setAttribute('data-theme', stored.state.theme);
+        }
+      } catch(e) {}
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

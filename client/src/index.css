@@ -1,32 +1,46 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: false;
+  themes: light, dark;
 }
 
 /* We define a fully custom theme based on the user's requirements */
 @theme {
   --font-display: "Space Grotesk", sans-serif;
   --font-body: "Inter", sans-serif;
-  
-  /* Primary crimson brand color */
+}
+
+/* Light theme (default) */
+[data-theme="light"] {
   --color-primary: #B91C1C;
   --color-primary-content: #FFFFFF;
-  
-  /* Warm off-white background system */
-  --color-base-100: #FAFAF9; /* stone-50 */
-  --color-base-200: #F5F5F4; /* stone-100 */
-  --color-base-300: #E7E5E4; /* stone-200 */
-  --color-base-content: #1C1917; /* stone-900 near black */
-  
+  --color-base-100: #FAFAF9;
+  --color-base-200: #F5F5F4;
+  --color-base-300: #E7E5E4;
+  --color-base-content: #1C1917;
   --color-error: #DC2626;
   --color-success: #16A34A;
   --color-warning: #D97706;
   --color-info: #2563EB;
 }
 
+/* Dark theme */
+[data-theme="dark"] {
+  --color-primary: #EF4444;
+  --color-primary-content: #FFFFFF;
+  --color-base-100: #1A1A2E;
+  --color-base-200: #16213E;
+  --color-base-300: #0F3460;
+  --color-base-content: #E8E8E8;
+  --color-error: #F87171;
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-info: #60A5FA;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   body {
@@ -66,12 +80,17 @@ code {
     outline: none !important;
   }
 
-  /* Glassmorphism utility — used sparingly for premium feel */
+  /* Glassmorphism utility — adapts to theme */
   .glass-card {
     background: rgba(250, 250, 249, 0.7);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(231, 229, 228, 0.6);
+  }
+
+  [data-theme="dark"] .glass-card {
+    background: rgba(26, 26, 46, 0.7);
+    border: 1px solid rgba(15, 52, 96, 0.6);
   }
 }
 

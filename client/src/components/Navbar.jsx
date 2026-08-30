@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Drop, SignOut, List, X } from '@phosphor-icons/react';
+import { Drop, SignOut, List, X, Sun, Moon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
+import { useThemeStore } from '../store/useThemeStore';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Navbar = () => {
   const { authUser, logout } = useAuthStore();
+  const { theme, toggleTheme } = useThemeStore();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -63,9 +65,51 @@ const Navbar = () => {
                     </li>
                   </ul>
                 </div>
+                <button
+                  onClick={toggleTheme}
+                  className="btn btn-ghost btn-circle text-base-content/70 hover:text-primary transition-colors"
+                  aria-label="Toggle theme"
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={theme}
+                      initial={{ y: -16, opacity: 0, rotate: -90 }}
+                      animate={{ y: 0, opacity: 1, rotate: 0 }}
+                      exit={{ y: 16, opacity: 0, rotate: 90 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {theme === 'light' ? (
+                        <Moon weight="duotone" className="w-5 h-5" />
+                      ) : (
+                        <Sun weight="duotone" className="w-5 h-5" />
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </button>
               </>
             ) : (
               <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleTheme}
+                  className="btn btn-ghost btn-circle text-base-content/70 hover:text-primary transition-colors"
+                  aria-label="Toggle theme"
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={theme}
+                      initial={{ y: -16, opacity: 0, rotate: -90 }}
+                      animate={{ y: 0, opacity: 1, rotate: 0 }}
+                      exit={{ y: 16, opacity: 0, rotate: 90 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {theme === 'light' ? (
+                        <Moon weight="duotone" className="w-5 h-5" />
+                      ) : (
+                        <Sun weight="duotone" className="w-5 h-5" />
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </button>
                 <Link to="/login" className="btn btn-ghost rounded-full px-6 font-semibold">Log in</Link>
                 <Link to="/register" className="btn btn-primary rounded-full px-6 text-white font-bold border-none shadow-md shadow-primary/20">Sign up</Link>
               </div>
@@ -124,6 +168,16 @@ const Navbar = () => {
                     </div>
                     <Link to="/dashboard" className="btn btn-ghost justify-start font-semibold text-lg">Dashboard</Link>
                     <Link to="/create-request" className="btn btn-ghost justify-start font-semibold text-lg">New Request</Link>
+                    <button
+                      onClick={toggleTheme}
+                      className="btn btn-ghost justify-start font-semibold text-lg gap-3"
+                    >
+                      {theme === 'light' ? (
+                        <><Moon weight="duotone" className="w-5 h-5" /> Dark Mode</>
+                      ) : (
+                        <><Sun weight="duotone" className="w-5 h-5" /> Light Mode</>
+                      )}
+                    </button>
                     <div className="divider my-2"></div>
                     <button onClick={logout} className="btn btn-error btn-outline mt-auto w-full font-bold gap-2 rounded-xl">
                       <SignOut weight="regular" className="w-5 h-5" />

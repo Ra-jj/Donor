@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
+import { useThemeStore } from './store/useThemeStore';
 import { Toaster } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -29,7 +30,12 @@ const PageTransition = ({ children, className = '' }) => (
 
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
+  const { initTheme } = useThemeStore();
   const location = useLocation();
+
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
 
   useEffect(() => {
     checkAuth();
