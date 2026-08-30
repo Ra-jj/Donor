@@ -34,8 +34,12 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-server.listen(PORT, async () => {
-  await connectDB();
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, async () => {
+    await connectDB();
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
 

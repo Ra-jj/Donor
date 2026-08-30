@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
@@ -6,7 +6,9 @@ import { getSocket } from '../lib/socket';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import ChatWindow from '../components/ChatWindow';
-import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart, ChatCircleDots } from '@phosphor-icons/react';
+import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart } from '@phosphor-icons/react';
+
+const DonorMap = lazy(() => import('../components/DonorMap'));
 
 /** Swipeable request card for mobile — drag right to accept, left to decline */
 const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, children }) => {
@@ -97,7 +99,7 @@ const DashboardPage = () => {
       
       const urlBase64ToUint8Array = (base64String) => {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
         const rawData = window.atob(base64);
         const outputArray = new Uint8Array(rawData.length);
         for (let i = 0; i < rawData.length; ++i) {
@@ -233,13 +235,20 @@ const DashboardPage = () => {
           <p className="text-base-content/70 font-medium text-lg">Your Blood Group: <strong className="text-primary bg-primary/10 px-3 py-1 rounded-full ml-1">{authUser?.bloodGroup || 'Not set'}</strong></p>
         </div>
         
-        <div className="flex items-center gap-4 z-10 relative w-full sm:w-auto">
-          <Link to="/create-request" className="btn btn-primary rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none w-full sm:w-auto">
+        <div className="hidden lg:flex items-center gap-4 z-10 relative w-full sm:w-auto">
+          <Link to="/create-request" className="btn btn-primary rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none w-full sm:w-auto active:scale-95 transition-transform">
             <Plus weight="bold" className="w-5 h-5 mr-1" />
             Request Blood
           </Link>
         </div>
       </motion.div>
+
+      {/* Mobile FAB */}
+      <div className="lg:hidden fixed bottom-6 right-6 z-40">
+        <Link to="/create-request" className="btn btn-primary btn-circle w-14 h-14 shadow-lg shadow-primary/30 glow-primary text-white flex items-center justify-center active:scale-90 transition-transform">
+          <Plus weight="bold" className="w-7 h-7" />
+        </Link>
+      </div>
 
       {/* Push Notification Banner */}
       {'Notification' in window && !pushEnabled && (
@@ -262,7 +271,7 @@ const DashboardPage = () => {
       )}
 
       {/* Tabs with animated indicator */}
-      <div className="flex justify-center sm:justify-start">
+      <div className={`flex justify-center sm:justify-start ${selectedRequestId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="bg-base-100 border border-base-300 p-1.5 rounded-2xl inline-flex shadow-sm w-full sm:w-auto relative">
           <button 
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'incoming' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
@@ -293,9 +302,9 @@ const DashboardPage = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
         {/* List Section */}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${selectedRequestId ? 'hidden lg:block' : 'block'}`}>
           <AnimatePresence mode="wait">
             {activeTab === 'incoming' && (
               <motion.div
@@ -324,7 +333,19 @@ const DashboardPage = () => {
                         onSelect={setSelectedRequestId}
                         isSelected={selectedRequestId === req._id}
                       >
-                          <div className="card-body p-5">
+                        {req.hospitalLocation?.coordinates && (
+                          <div className="w-full relative bg-base-200 border-b border-base-200 overflow-hidden">
+                            <Suspense fallback={<div className="h-[150px] flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
+                              <DonorMap 
+                                hospitalLocation={req.hospitalLocation.coordinates} 
+                                interactive={false}
+                                userLocation={authUser?.location?.coordinates}
+                                height="h-[150px]"
+                              />
+                            </Suspense>
+                          </div>
+                        )}
+                        <div className="card-body p-5">
                           <div className="flex justify-between items-start gap-3">
                             <h3 className="card-title text-lg flex-1 leading-snug">{req.hospitalName}</h3>
                             <div className="flex items-center gap-2 shrink-0">
@@ -416,7 +437,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Chat Section */}
-        <div className="w-full lg:sticky lg:top-8 h-fit mt-8 lg:mt-0">
+        <div className={`w-full lg:sticky lg:top-24 h-fit mt-8 lg:mt-0 ${!selectedRequestId ? 'hidden lg:block' : 'block'}`}>
           {(() => {
             // Find the specifically selected request
             let activeChatRequest = null;
@@ -432,10 +453,18 @@ const DashboardPage = () => {
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3 }}
-                  className="w-full"
+                  className="w-full flex flex-col"
                 >
-                  <div className="mb-2 text-sm font-semibold opacity-70">
-                    Coordinating for: {activeChatRequest.hospitalName}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-semibold opacity-70">
+                      Coordinating for: {activeChatRequest.hospitalName}
+                    </div>
+                    <button 
+                      onClick={() => setSelectedRequestId(null)}
+                      className="lg:hidden text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
+                    >
+                      ← Back to Requests
+                    </button>
                   </div>
                   <ChatWindow requestId={activeChatRequest._id} currentUserId={authUser._id} />
                 </motion.div>

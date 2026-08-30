@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { getSocket } from '../lib/socket';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
@@ -95,7 +95,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col h-125 border border-base-300 rounded-3xl bg-base-100 shadow-xl overflow-hidden shadow-base-content/5"
+      className="flex flex-col h-[calc(100vh-140px)] lg:h-[500px] border border-base-300 rounded-3xl bg-base-100 shadow-xl overflow-hidden shadow-base-content/5"
     >
       {/* Header */}
       <div className="bg-primary/5 border-b border-primary/10 text-base-content p-4 font-bold flex items-center gap-3">
@@ -137,11 +137,11 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       </div>
 
       {/* Input Area */}
-      <form onSubmit={handleSendMessage} className="p-4 bg-base-100 border-t border-base-200 flex gap-3">
+      <form onSubmit={handleSendMessage} className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-base-100 border-t border-base-200 flex gap-3">
         <input
           type="text"
           placeholder="Type your message..."
-          className="input w-full pl-4 rounded-2xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium flex-1"
+          className="input w-full pl-4 rounded-2xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium flex-1 text-base"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />

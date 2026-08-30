@@ -19,13 +19,13 @@ const RegisterPage = () => {
     location: null, // [lng, lat]
   });
 
-  const [emailError, setEmailError] = useState('');
+  const [errors, setErrors] = useState({});
 
   const handleEmailBlur = () => {
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setEmailError('Please enter a valid email address');
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address (e.g. name@domain.com)' }));
     } else {
-      setEmailError('');
+      setErrors(prev => ({ ...prev, email: '' }));
     }
   };
 
@@ -53,16 +53,22 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setEmailError('Please enter a valid email address');
+    setErrors({});
+    
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address (e.g. name@domain.com)' }));
       return;
     }
     if (!formData.location) {
+      setErrors(prev => ({ ...prev, location: 'Please provide your location to help match you with nearby emergencies.' }));
       toast.error('Please provide your location to help match you with nearby emergencies.');
       return;
     }
     setLoading(true);
-    await register(formData);
+    const result = await register(formData);
+    if (result && result.errors) {
+      setErrors(result.errors);
+    }
     setLoading(false);
   };
 
@@ -107,13 +113,25 @@ const RegisterPage = () => {
                 </div>
                 <input 
                   type="text" 
-                  className="input w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  className={`input w-full pl-12 rounded-xl border ${errors.name ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`}
                   placeholder="John Doe"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
+                  }}
                 />
               </div>
+              {errors.name && (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 ml-1 font-medium"
+                >
+                  {errors.name}
+                </motion.span>
+              )}
             </motion.div>
 
             {/* Email */}
@@ -130,24 +148,25 @@ const RegisterPage = () => {
                 </div>
                 <input 
                   type="email" 
-                  className={`input w-full pl-12 rounded-xl border ${emailError ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all`}
+                  inputMode="email"
+                  className={`input w-full pl-12 rounded-xl border ${errors.email ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`}
                   placeholder="you@example.com"
                   required
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value });
-                    if (emailError) setEmailError('');
+                    if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
                   }}
                   onBlur={handleEmailBlur}
                 />
               </div>
-              {emailError && (
+              {errors.email && (
                 <motion.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
-                  {emailError}
+                  {errors.email}
                 </motion.span>
               )}
             </motion.div>
@@ -166,12 +185,15 @@ const RegisterPage = () => {
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
-                  className="input w-full pl-12 pr-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  className={`input w-full pl-12 pr-12 rounded-xl border ${errors.password ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`} 
                   placeholder="••••••••"
                   required
                   minLength={6}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                  }}
                 />
                 <button 
                   type="button"
@@ -181,7 +203,17 @@ const RegisterPage = () => {
                   {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
                 </button>
               </div>
-              <span className="text-base-content/40 text-xs mt-1.5 ml-1">At least 6 characters</span>
+              {errors.password ? (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 ml-1 font-medium"
+                >
+                  {errors.password}
+                </motion.span>
+              ) : (
+                <span className="text-base-content/40 text-xs mt-1.5 ml-1">At least 6 characters</span>
+              )}
             </motion.div>
 
             {/* Blood Group */}
@@ -197,10 +229,13 @@ const RegisterPage = () => {
                   <Drop weight="regular" className="h-5 w-5 text-primary/50" />
                 </div>
                 <select 
-                  className="select w-full pl-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
+                  className={`select w-full pl-12 rounded-xl border ${errors.bloodGroup ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all font-medium text-base`}
                   required
                   value={formData.bloodGroup}
-                  onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, bloodGroup: e.target.value });
+                    if (errors.bloodGroup) setErrors(prev => ({ ...prev, bloodGroup: '' }));
+                  }}
                 >
                   <option value="" disabled>Select your blood group</option>
                   {BLOOD_GROUPS.map((bg) => (
@@ -208,6 +243,15 @@ const RegisterPage = () => {
                   ))}
                 </select>
               </div>
+              {errors.bloodGroup && (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 ml-1 font-medium"
+                >
+                  {errors.bloodGroup}
+                </motion.span>
+              )}
             </motion.div>
 
             {/* Location */}
@@ -221,7 +265,7 @@ const RegisterPage = () => {
               <div className="flex flex-col gap-3">
                 <button 
                   type="button" 
-                  className={`btn w-full rounded-xl font-bold border-2 transition-all ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-[0.98] ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                   onClick={handleGetLocation}
                 >
                   <MapPin weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
@@ -235,11 +279,11 @@ const RegisterPage = () => {
                     type="text" 
                     id="manual-location-input"
                     placeholder="E.g. Kolkata, NY, etc." 
-                    className="input w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                    className="input w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base"
                   />
                   <button 
                     type="button" 
-                    className="btn btn-secondary rounded-xl font-bold"
+                    className="btn btn-secondary rounded-xl font-bold active:scale-[0.98] transition-transform"
                     onClick={async () => {
                       const query = document.getElementById('manual-location-input').value;
                       if (!query) return toast.error('Please enter a city name');
@@ -256,7 +300,7 @@ const RegisterPage = () => {
                         } else {
                           toast.error('City not found. Try another.', { id: 'geoSearch' });
                         }
-                      } catch (err) {
+                      } catch {
                         toast.error('Failed to search location', { id: 'geoSearch' });
                       }
                     }}
@@ -265,13 +309,21 @@ const RegisterPage = () => {
                   </button>
                 </div>
               </div>
-              {formData.location && (
+              {formData.location ? (
                 <motion.span 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-xs font-semibold text-success mt-3 text-center"
                 >
                   Coordinates: {formData.location[0].toFixed(4)}, {formData.location[1].toFixed(4)}
+                </motion.span>
+              ) : errors.location && (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 text-center font-medium"
+                >
+                  {errors.location}
                 </motion.span>
               )}
             </motion.div>
@@ -280,10 +332,10 @@ const RegisterPage = () => {
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={fieldDelay(5)}
+              transition={fieldDelay(6)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-12" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Create Account'}
               </button>
             </motion.div>

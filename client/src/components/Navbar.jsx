@@ -110,15 +110,15 @@ const Navbar = () => {
                     </motion.div>
                   </AnimatePresence>
                 </button>
-                <Link to="/login" className="btn btn-ghost rounded-full px-6 font-semibold">Log in</Link>
-                <Link to="/register" className="btn btn-primary rounded-full px-6 text-white font-bold border-none shadow-md shadow-primary/20">Sign up</Link>
+                <Link to="/login" className="btn btn-ghost rounded-full px-6 font-semibold active:scale-95 transition-transform min-h-[44px]">Log in</Link>
+                <Link to="/register" className="btn btn-primary rounded-full px-6 text-white font-bold border-none shadow-md shadow-primary/20 active:scale-95 transition-transform min-h-[44px]">Sign up</Link>
               </div>
             )}
           </div>
 
           {/* Mobile Hamburger */}
           <button 
-            className="md:hidden btn btn-ghost btn-circle"
+            className="md:hidden btn btn-ghost btn-circle active:scale-95 transition-transform min-h-[44px] min-w-[44px]"
             onClick={() => setMobileMenuOpen(true)}
           >
             <List weight="regular" className="w-7 h-7" />
@@ -149,7 +149,7 @@ const Navbar = () => {
                   <Drop weight="duotone" className="w-7 h-7 text-primary" />
                   <span className="text-xl font-display font-extrabold text-base-content">Donor</span>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="btn btn-ghost btn-circle btn-sm">
+                <button onClick={() => setMobileMenuOpen(false)} className="btn btn-ghost btn-circle btn-sm active:scale-95 transition-transform min-h-[44px] min-w-[44px]">
                   <X weight="regular" className="w-6 h-6" />
                 </button>
               </div>
@@ -170,7 +170,7 @@ const Navbar = () => {
                     <Link to="/create-request" className="btn btn-ghost justify-start font-semibold text-lg">New Request</Link>
                     <button
                       onClick={toggleTheme}
-                      className="btn btn-ghost justify-start font-semibold text-lg gap-3"
+                      className="btn btn-ghost justify-start font-semibold text-lg gap-3 active:scale-95 transition-transform min-h-[44px]"
                     >
                       {theme === 'light' ? (
                         <><Moon weight="duotone" className="w-5 h-5" /> Dark Mode</>
@@ -179,15 +179,15 @@ const Navbar = () => {
                       )}
                     </button>
                     <div className="divider my-2"></div>
-                    <button onClick={logout} className="btn btn-error btn-outline mt-auto w-full font-bold gap-2 rounded-xl">
+                    <button onClick={logout} className="btn btn-error btn-outline mt-auto w-full font-bold gap-2 rounded-xl active:scale-95 transition-transform min-h-[44px]">
                       <SignOut weight="regular" className="w-5 h-5" />
                       Log out
                     </button>
                   </>
                 ) : (
                   <>
-                    <Link to="/login" className="btn btn-ghost btn-lg justify-start font-semibold">Log in</Link>
-                    <Link to="/register" className="btn btn-primary btn-lg text-white font-bold rounded-xl mt-2 shadow-primary/20 shadow-lg">Create Account</Link>
+                    <Link to="/login" className="btn btn-ghost btn-lg justify-start font-semibold active:scale-95 transition-transform min-h-[44px]">Log in</Link>
+                    <Link to="/register" className="btn btn-primary btn-lg text-white font-bold rounded-xl mt-2 shadow-primary/20 shadow-lg active:scale-95 transition-transform min-h-[44px]">Create Account</Link>
                   </>
                 )}
               </div>

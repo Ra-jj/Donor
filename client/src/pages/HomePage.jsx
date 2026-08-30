@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform } from 'motion/react';
 import { 
   UserPlus, HandHeart, CheckCircle, ArrowRight, Drop, 
   ShieldCheck, Lightning, ChatCircleDots, MapPin,
-  Heart, Heartbeat, Clock, Users
+  Heart, Heartbeat
 } from '@phosphor-icons/react';
 
 /* ──────────────────────────────── DATA ──────────────────────────────── */
@@ -139,7 +139,7 @@ const HomePage = () => {
 
           {/* Headline — staggered word reveal */}
           <motion.h1
-            className="text-5xl md:text-7xl font-display font-extrabold text-base-content leading-[1.08] tracking-tight mb-6"
+            className="text-4xl md:text-5xl lg:text-7xl font-display font-extrabold text-base-content leading-[1.08] tracking-tight mb-6"
           >
             {["Find", "blood", "donors"].map((word, i) => (
               <motion.span
@@ -182,18 +182,18 @@ const HomePage = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 1 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-16"
+            className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-16 w-full"
           >
             <Link 
               to="/register" 
-              className="group btn btn-primary btn-lg rounded-full px-8 text-white font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all"
+              className="group btn btn-primary btn-lg rounded-full w-full sm:w-auto px-8 text-white font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all active:scale-[0.98]"
             >
               Get Started
               <ArrowRight weight="bold" className="w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link 
               to="/login" 
-              className="btn btn-ghost btn-lg rounded-full px-8 font-semibold text-base-content/70 hover:text-base-content hover:bg-base-300/50"
+              className="btn btn-ghost btn-lg rounded-full w-full sm:w-auto px-8 font-semibold text-base-content/70 hover:text-base-content hover:bg-base-300/50 active:scale-[0.98] transition-transform"
             >
               Log in
             </Link>
@@ -352,7 +352,7 @@ const HomePage = () => {
               </p>
               <Link
                 to="/register"
-                className="group inline-flex items-center gap-2 bg-white text-primary font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg"
+                className="group inline-flex justify-center items-center gap-2 w-full sm:w-auto bg-white text-primary font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg active:scale-[0.98]"
               >
                 Create Free Account
                 <ArrowRight weight="bold" className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

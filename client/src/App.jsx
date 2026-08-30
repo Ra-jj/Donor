@@ -59,7 +59,7 @@ function App() {
     <div className="min-h-screen bg-base-200 text-base-content font-sans">
       <Navbar />
       
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full pt-20">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={

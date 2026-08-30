@@ -13,24 +13,29 @@ const LoginPage = () => {
     password: '',
   });
 
-  const [emailError, setEmailError] = useState('');
+  const [errors, setErrors] = useState({});
 
   const handleEmailBlur = () => {
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setEmailError('Please enter a valid email address');
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address (e.g. name@domain.com)' }));
     } else {
-      setEmailError('');
+      setErrors(prev => ({ ...prev, email: '' }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setEmailError('Please enter a valid email address');
+    setErrors({});
+    
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address (e.g. name@domain.com)' }));
       return;
     }
     setLoading(true);
-    await login(formData);
+    const result = await login(formData);
+    if (result && result.errors) {
+      setErrors(result.errors);
+    }
     setLoading(false);
   };
 
@@ -72,24 +77,25 @@ const LoginPage = () => {
                 </div>
                 <input 
                   type="email" 
-                  className={`input w-full pl-12 rounded-xl border ${emailError ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all`}
+                  inputMode="email"
+                  className={`input w-full pl-12 rounded-xl border ${errors.email ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`}
                   placeholder="you@example.com"
                   required
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value });
-                    if (emailError) setEmailError('');
+                    if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
                   }}
                   onBlur={handleEmailBlur}
                 />
               </div>
-              {emailError && (
+              {errors.email && (
                 <motion.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
-                  {emailError}
+                  {errors.email}
                 </motion.span>
               )}
             </motion.div>
@@ -108,11 +114,14 @@ const LoginPage = () => {
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
-                  className="input w-full pl-12 pr-12 rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all" 
+                  className={`input w-full pl-12 pr-12 rounded-xl border ${errors.password ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`} 
                   placeholder="••••••••"
                   required
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                  }}
                 />
                 <button 
                   type="button"
@@ -122,6 +131,15 @@ const LoginPage = () => {
                   {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
                 </button>
               </div>
+              {errors.password && (
+                <motion.span 
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-error text-sm mt-1.5 ml-1 font-medium"
+                >
+                  {errors.password}
+                </motion.span>
+              )}
             </motion.div>
 
             {/* Submit */}
@@ -131,7 +149,7 @@ const LoginPage = () => {
               transition={{ delay: 0.4, duration: 0.4 }}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-12" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : (
                   <>
                     <SignIn weight="bold" className="w-5 h-5 mr-1" />

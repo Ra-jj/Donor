@@ -26,8 +26,13 @@ export const useAuthStore = create((set) => ({
       set({ authUser: res.data.user });
       initSocket(res.data.user._id);
       toast.success('Account created successfully');
+      return { success: true };
     } catch (error) {
+      if (error.response?.data?.errors) {
+        return { success: false, errors: error.response.data.errors };
+      }
       toast.error(error.response?.data?.message || 'Registration failed');
+      return { success: false };
     }
   },
 
@@ -37,8 +42,13 @@ export const useAuthStore = create((set) => ({
       set({ authUser: res.data.user });
       initSocket(res.data.user._id);
       toast.success('Logged in successfully');
+      return { success: true };
     } catch (error) {
+      if (error.response?.data?.errors) {
+        return { success: false, errors: error.response.data.errors };
+      }
       toast.error(error.response?.data?.message || 'Login failed');
+      return { success: false };
     }
   },
 
