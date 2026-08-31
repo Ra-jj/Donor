@@ -14,6 +14,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import CreateRequestPage from './pages/CreateRequestPage';
+import ProfilePage from './pages/ProfilePage';
+import OfflineOverlay from './components/OfflineOverlay';
 
 // Animated page wrapper for smooth route transitions
 const PageTransition = ({ children, className = '' }) => (
@@ -57,6 +59,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-base-200 text-base-content font-sans">
+      <OfflineOverlay />
       <Navbar />
       
       <main className="flex-1 w-full pt-20">
@@ -96,6 +99,13 @@ function App() {
               <ProtectedRoute>
                 <PageTransition className="container mx-auto px-4 py-8 max-w-5xl">
                   <CreateRequestPage />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <PageTransition className="container mx-auto px-4 py-8 max-w-5xl">
+                  <ProfilePage />
                 </PageTransition>
               </ProtectedRoute>
             } />

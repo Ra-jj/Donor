@@ -58,6 +58,11 @@ const Navbar = () => {
                     </li>
                     <div className="divider my-0"></div>
                     <li className="p-1">
+                      <Link to="/profile" className="hover:bg-base-200 flex gap-3 py-3 rounded-xl font-semibold text-base-content/80">
+                        Profile
+                      </Link>
+                    </li>
+                    <li className="p-1">
                       <button onClick={logout} className="text-error hover:bg-error/10 hover:text-error flex gap-3 py-3 rounded-xl font-semibold">
                         <SignOut weight="regular" className="w-5 h-5" />
                         Log out
@@ -168,6 +173,7 @@ const Navbar = () => {
                     </div>
                     <Link to="/dashboard" className="btn btn-ghost justify-start font-semibold text-lg">Dashboard</Link>
                     <Link to="/create-request" className="btn btn-ghost justify-start font-semibold text-lg">New Request</Link>
+                    <Link to="/profile" className="btn btn-ghost justify-start font-semibold text-lg">Profile</Link>
                     <button
                       onClick={toggleTheme}
                       className="btn btn-ghost justify-start font-semibold text-lg gap-3 active:scale-95 transition-transform min-h-[44px]"

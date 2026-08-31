@@ -6,7 +6,9 @@ import { getSocket } from '../lib/socket';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import ChatWindow from '../components/ChatWindow';
-import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart } from '@phosphor-icons/react';
+import StatsCard from '../components/StatsCard';
+import StarRating from '../components/StarRating';
+import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart, Star, CheckCircle } from '@phosphor-icons/react';
 
 const DonorMap = lazy(() => import('../components/DonorMap'));
 
@@ -86,6 +88,13 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [pushEnabled, setPushEnabled] = useState(!!authUser?.pushSubscription);
+  const [stats, setStats] = useState(null);
+
+  // Rating state — tracks which request is being rated
+  const [ratingRequestId, setRatingRequestId] = useState(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingNote, setRatingNote] = useState('');
+  const [ratingLoading, setRatingLoading] = useState(false);
 
   const enablePushNotifications = async () => {
     try {
@@ -125,12 +134,14 @@ const DashboardPage = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [mineRes, incomingRes] = await Promise.all([
+      const [mineRes, incomingRes, statsRes] = await Promise.all([
         axiosInstance.get('/requests/mine'),
-        axiosInstance.get('/requests/incoming')
+        axiosInstance.get('/requests/incoming'),
+        axiosInstance.get('/users/stats'),
       ]);
       setMyRequests(mineRes.data.requests);
       setIncomingRequests(incomingRes.data.incomingRequests);
+      setStats(statsRes.data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard');
@@ -175,12 +186,24 @@ const DashboardPage = () => {
     const handleStatusUpdate = (data) => {
       if (data.status === 'accepted') {
         toast.success(`${data.donorName} accepted your request!`, { icon: '✅', duration: 5000 });
+      } else if (data.status === 'fulfilled') {
+        toast.success('Request has been marked as fulfilled! Thank you for donating. 🩸', { duration: 5000 });
+      } else if (data.status === 'rated') {
+        toast.success(`You received a ${data.rating}★ rating! ${data.ratingNote ? '"' + data.ratingNote + '"' : ''}`, { icon: '⭐', duration: 5000 });
       }
       
       // Update my requests list to reflect the new status
       setMyRequests((prev) => prev.map(req => 
         req._id === data.requestId ? { ...req, status: data.status, matchedDonorId: 'temp_id' } : req
       ));
+
+      // Update incoming requests for the donor side
+      setIncomingRequests((prev) => prev.map(req => 
+        req._id === data.requestId ? { ...req, status: data.status === 'rated' ? 'fulfilled' : data.status, rating: data.rating || req.rating, ratingNote: data.ratingNote || req.ratingNote } : req
+      ));
+
+      // Refresh stats after a status change
+      axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
     };
 
     socket.on('requestStatusUpdate', handleStatusUpdate);
@@ -198,6 +221,41 @@ const DashboardPage = () => {
     } catch (err) {
       console.error(err);
       toast.error('Failed to update request status');
+    }
+  };
+
+  const handleFulfill = async (requestId) => {
+    try {
+      await axiosInstance.patch(`/requests/${requestId}/fulfill`);
+      toast.success('Request marked as fulfilled! 🎉');
+      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to mark as fulfilled');
+    }
+  };
+
+  const handleRate = async (requestId) => {
+    if (ratingValue === 0) {
+      toast.error('Please select a rating');
+      return;
+    }
+    try {
+      setRatingLoading(true);
+      await axiosInstance.post(`/requests/${requestId}/rate`, {
+        rating: ratingValue,
+        ratingNote: ratingNote,
+      });
+      toast.success('Rating submitted! Thank you. ⭐');
+      setRatingRequestId(null);
+      setRatingValue(0);
+      setRatingNote('');
+      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to submit rating');
+    } finally {
+      setRatingLoading(false);
     }
   };
 
@@ -242,6 +300,17 @@ const DashboardPage = () => {
           </Link>
         </div>
       </motion.div>
+
+      {/* Your Impact Stats Card */}
+      {stats && (stats.donor.livesSaved > 0 || stats.requester.totalCreated > 0) && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <StatsCard donorStats={stats.donor} requesterStats={stats.requester} />
+        </motion.div>
+      )}
 
       {/* Mobile FAB */}
       <div className="lg:hidden fixed bottom-6 right-6 z-40">
@@ -333,50 +402,78 @@ const DashboardPage = () => {
                         onSelect={setSelectedRequestId}
                         isSelected={selectedRequestId === req._id}
                       >
-                        {req.hospitalLocation?.coordinates && (
-                          <div className="w-full relative bg-base-200 border-b border-base-200 overflow-hidden">
-                            <Suspense fallback={<div className="h-[150px] flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
-                              <DonorMap 
-                                hospitalLocation={req.hospitalLocation.coordinates} 
-                                interactive={false}
-                                userLocation={authUser?.location?.coordinates}
-                                height="h-[150px]"
-                              />
-                            </Suspense>
-                          </div>
-                        )}
-                        <div className="card-body p-5">
-                          <div className="flex justify-between items-start gap-3">
-                            <h3 className="card-title text-lg flex-1 leading-snug">{req.hospitalName}</h3>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {req.matchType === 'exact' ? (
-                                <span className="badge badge-success badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-success/20">Exact Match</span>
-                              ) : req.matchType === 'compatible' ? (
-                                <span className="badge badge-info badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-info/20">Compatible Match</span>
-                              ) : null}
-                              <UrgencyBadge urgency={req.urgency} />
+                        {/* Fulfilled Thank You state for donor */}
+                        {req.status === 'fulfilled' ? (
+                          <div className="card-body p-5">
+                            <div className="bg-success/5 border border-success/10 rounded-2xl p-5 text-center space-y-3">
+                              <CheckCircle weight="fill" className="w-12 h-12 text-success mx-auto" />
+                              <h3 className="font-display font-bold text-lg text-success">Donation Complete!</h3>
+                              <p className="text-sm text-base-content/70">
+                                Thank you for donating at <strong>{req.hospitalName}</strong>.
+                              </p>
+                              {req.rating ? (
+                                <div className="space-y-1">
+                                  <StarRating rating={req.rating} size="w-5 h-5" className="justify-center" />
+                                  <p className="text-xs text-base-content/50">
+                                    Rated {req.rating}/5 by the requester
+                                  </p>
+                                  {req.ratingNote && (
+                                    <p className="text-sm italic text-base-content/60 mt-2">"{req.ratingNote}"</p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-base-content/40">Awaiting rating from requester</p>
+                              )}
                             </div>
                           </div>
-                          <p className="text-sm text-base-content/70">
-                            Needs: <strong>{req.unitsNeeded} units</strong> of {req.bloodGroup}
-                          </p>
-                          
-                          <div className="card-actions justify-end mt-4">
-                            {req.status === 'pending' ? (
-                              <>
-                                <span className="text-xs text-base-content/30 font-medium self-center mr-2 md:hidden">
-                                  Swipe or tap →
-                                </span>
-                                <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-error">Decline</button>
-                                <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }} className="btn btn-sm btn-success text-white">Accept & Help</button>
-                              </>
-                            ) : req.status === 'accepted' ? (
-                              <div className="badge badge-success text-white p-3 font-semibold">Accepted by you</div>
-                            ) : (
-                              <div className="badge">{req.status}</div>
+                        ) : (
+                          <>
+                            {req.hospitalLocation?.coordinates && (
+                              <div className="w-full relative bg-base-200 border-b border-base-200 overflow-hidden">
+                                <Suspense fallback={<div className="h-[150px] flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
+                                  <DonorMap 
+                                    hospitalLocation={req.hospitalLocation.coordinates} 
+                                    interactive={false}
+                                    userLocation={authUser?.location?.coordinates}
+                                    height="h-[150px]"
+                                  />
+                                </Suspense>
+                              </div>
                             )}
-                          </div>
-                        </div>
+                            <div className="card-body p-5">
+                              <div className="flex justify-between items-start gap-3">
+                                <h3 className="card-title text-lg flex-1 leading-snug">{req.hospitalName}</h3>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {req.matchType === 'exact' ? (
+                                    <span className="badge badge-success badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-success/20">Exact Match</span>
+                                  ) : req.matchType === 'compatible' ? (
+                                    <span className="badge badge-info badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-info/20">Compatible Match</span>
+                                  ) : null}
+                                  <UrgencyBadge urgency={req.urgency} />
+                                </div>
+                              </div>
+                              <p className="text-sm text-base-content/70">
+                                Needs: <strong>{req.unitsNeeded} units</strong> of {req.bloodGroup}
+                              </p>
+                              
+                              <div className="card-actions justify-end mt-4">
+                                {req.status === 'pending' ? (
+                                  <>
+                                    <span className="text-xs text-base-content/30 font-medium self-center mr-2 md:hidden">
+                                      Swipe or tap →
+                                    </span>
+                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-error">Decline</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }} className="btn btn-sm btn-success text-white">Accept & Help</button>
+                                  </>
+                                ) : req.status === 'accepted' ? (
+                                  <div className="badge badge-success text-white p-3 font-semibold">Accepted by you</div>
+                                ) : (
+                                  <div className="badge">{req.status}</div>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </SwipeableRequestCard>
                     ))}
                   </AnimatePresence>
@@ -414,16 +511,96 @@ const DashboardPage = () => {
                         <div className="card-body p-5">
                           <div className="flex justify-between items-start">
                             <h3 className="card-title text-lg">{req.hospitalName}</h3>
-                            <div className={`badge ${req.status === 'pending' ? 'badge-warning' : req.status === 'accepted' ? 'badge-success text-white' : ''}`}>
+                            <div className={`badge ${
+                              req.status === 'pending' ? 'badge-warning' : 
+                              req.status === 'accepted' ? 'badge-success text-white' : 
+                              req.status === 'fulfilled' ? 'badge-info text-white' : ''
+                            }`}>
                               {req.status.toUpperCase()}
                             </div>
                           </div>
                           <p className="text-sm text-base-content/70 mt-2">
                             {req.unitsNeeded} units • {req.bloodGroup}
                           </p>
+
+                          {/* Accepted state: show chat prompt + fulfill button */}
                           {req.status === 'accepted' && (
-                            <div className="alert alert-success bg-success/10 text-success border-success/20 p-2 mt-2 flex justify-center">
-                              A donor has accepted this request! Open chat to coordinate.
+                            <div className="space-y-3 mt-2">
+                              <div className="alert alert-success bg-success/10 text-success border-success/20 p-2 flex justify-center text-center">
+                                A donor has accepted this request! Open chat to coordinate.
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleFulfill(req._id); }}
+                                className="btn btn-sm btn-primary w-full rounded-xl font-bold shadow-sm"
+                              >
+                                <CheckCircle weight="bold" className="w-4 h-4" />
+                                Mark as Fulfilled
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Fulfilled state: show rating widget or rating result */}
+                          {req.status === 'fulfilled' && (
+                            <div className="mt-3 space-y-3">
+                              <div className="flex items-center gap-2 text-sm text-info font-semibold">
+                                <CheckCircle weight="fill" className="w-4 h-4" />
+                                Fulfilled {req.fulfilledAt && `on ${new Date(req.fulfilledAt).toLocaleDateString()}`}
+                              </div>
+
+                              {req.rating ? (
+                                /* Already rated — show static result */
+                                <div className="bg-warning/5 border border-warning/10 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <StarRating rating={req.rating} size="w-4 h-4" />
+                                    <span className="text-sm font-semibold text-base-content/70">{req.rating}/5</span>
+                                  </div>
+                                  {req.ratingNote && (
+                                    <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-[150px]" title={req.ratingNote}>"{req.ratingNote}"</span>
+                                  )}
+                                </div>
+                              ) : ratingRequestId === req._id ? (
+                                /* Rating form is open */
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  className="bg-base-200/50 border border-base-300 rounded-xl p-4 space-y-3 text-center"
+                                >
+                                  <p className="text-sm font-semibold text-base-content">Rate your experience</p>
+                                  <StarRating rating={ratingValue} onRate={setRatingValue} interactive size="w-8 h-8" className="justify-center" />
+                                  <input
+                                    type="text"
+                                    placeholder="Optional: leave a note for the donor..."
+                                    className="input input-sm w-full rounded-lg border-base-300 text-base"
+                                    value={ratingNote}
+                                    onChange={(e) => setRatingNote(e.target.value)}
+                                    maxLength={500}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => { setRatingRequestId(null); setRatingValue(0); setRatingNote(''); }}
+                                      className="btn btn-sm btn-ghost flex-1"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => handleRate(req._id)}
+                                      disabled={ratingValue === 0 || ratingLoading}
+                                      className="btn btn-sm btn-warning text-white flex-1 font-bold"
+                                    >
+                                      {ratingLoading ? <span className="loading loading-spinner loading-xs"></span> : 'Submit Rating'}
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              ) : (
+                                /* Not yet rated — show rate button */
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setRatingRequestId(req._id); }}
+                                  className="btn btn-sm btn-outline btn-warning w-full rounded-xl font-bold"
+                                >
+                                  <Star weight="bold" className="w-4 h-4" />
+                                  Rate this Donor
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -447,7 +624,7 @@ const DashboardPage = () => {
               activeChatRequest = currentList.find(r => r._id === selectedRequestId);
             }
 
-            if (activeChatRequest) {
+            if (activeChatRequest && activeChatRequest.status === 'accepted') {
               return (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.98 }}

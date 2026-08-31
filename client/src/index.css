@@ -28,10 +28,10 @@
 [data-theme="dark"] {
   --color-primary: #EF4444;
   --color-primary-content: #FFFFFF;
-  --color-base-100: #1A1A2E;
-  --color-base-200: #16213E;
-  --color-base-300: #0F3460;
-  --color-base-content: #E8E8E8;
+  --color-base-100: #1C1917;
+  --color-base-200: #292524;
+  --color-base-300: #44403C;
+  --color-base-content: #F5F5F4;
   --color-error: #F87171;
   --color-success: #4ADE80;
   --color-warning: #FBBF24;
@@ -90,8 +90,16 @@ code {
   }
 
   [data-theme="dark"] .glass-card {
-    background: rgba(26, 26, 46, 0.7);
-    border: 1px solid rgba(15, 52, 96, 0.6);
+    background: rgba(28, 25, 23, 0.7);
+    border: 1px solid rgba(68, 64, 60, 0.6);
+  }
+
+  /* Dark mode map tile filter */
+  [data-theme="dark"] .leaflet-layer,
+  [data-theme="dark"] .leaflet-control-zoom-in,
+  [data-theme="dark"] .leaflet-control-zoom-out,
+  [data-theme="dark"] .leaflet-control-attribution {
+    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
   }
 }
 

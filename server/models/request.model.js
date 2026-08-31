@@ -55,6 +55,22 @@ const requestSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     }],
+    fulfilledAt: {
+      type: Date,
+      default: null,
+    },
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null,
+    },
+    ratingNote: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500,
+    },
   },
   { timestamps: true }
 );

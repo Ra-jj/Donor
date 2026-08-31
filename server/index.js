@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth.route');
 const requestRoutes = require('./routes/request.route');
 const messageRoutes = require('./routes/message.route');
 const pushRoutes = require('./routes/push.route');
+const userRoutes = require('./routes/user.route');
 const { app, server } = require('./lib/socket');
 
 const PORT = process.env.PORT || 8000;
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/users', userRoutes);
 
 const path = require('path');
 

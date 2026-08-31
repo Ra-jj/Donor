@@ -136,7 +136,7 @@ exports.getIncomingRequests = async (req, res) => {
         },
         {
           matchedDonorId: donor._id,
-          status: 'accepted'
+          status: { $in: ['accepted', 'fulfilled'] }
         }
       ]
     })
@@ -202,6 +202,88 @@ exports.updateRequestStatus = async (req, res) => {
     res.status(200).json({ message: `Request status updated to ${status}`, request });
   } catch (error) {
     console.error('Error in updateRequestStatus:', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+exports.fulfillRequest = async (req, res) => {
+  try {
+    const request = await Request.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Only the original requester can mark as fulfilled
+    if (request.requesterId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the requester can mark this as fulfilled' });
+    }
+
+    if (request.status !== 'accepted') {
+      return res.status(400).json({ message: 'Only accepted requests can be marked as fulfilled' });
+    }
+
+    request.status = 'fulfilled';
+    request.fulfilledAt = new Date();
+    await request.save();
+
+    // Restore donor availability so they can accept future requests
+    if (request.matchedDonorId) {
+      await User.findByIdAndUpdate(request.matchedDonorId, { isAvailable: true });
+    }
+
+    // Notify the donor in real-time
+    io.to(request.matchedDonorId.toString()).emit('requestStatusUpdate', {
+      requestId: request._id,
+      status: 'fulfilled',
+      requesterName: req.user.name,
+    });
+
+    res.status(200).json({ message: 'Request marked as fulfilled', request });
+  } catch (error) {
+    console.error('Error in fulfillRequest:', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+exports.rateRequest = async (req, res) => {
+  try {
+    const request = await Request.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Only the original requester can rate
+    if (request.requesterId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the requester can rate this donation' });
+    }
+
+    if (request.status !== 'fulfilled') {
+      return res.status(400).json({ message: 'Only fulfilled requests can be rated' });
+    }
+
+    if (request.rating !== null) {
+      return res.status(400).json({ message: 'This request has already been rated' });
+    }
+
+    const { rating, ratingNote } = req.body;
+    request.rating = rating;
+    request.ratingNote = ratingNote || '';
+    await request.save();
+
+    // Notify the donor they received a rating
+    if (request.matchedDonorId) {
+      io.to(request.matchedDonorId.toString()).emit('requestStatusUpdate', {
+        requestId: request._id,
+        status: 'rated',
+        rating,
+        ratingNote: ratingNote || '',
+        requesterName: req.user.name,
+      });
+    }
+
+    res.status(200).json({ message: 'Rating submitted successfully', request });
+  } catch (error) {
+    console.error('Error in rateRequest:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
