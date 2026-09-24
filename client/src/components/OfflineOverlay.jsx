@@ -25,7 +25,7 @@ const OfflineOverlay = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-base-100/95 backdrop-blur-md p-6 text-center"
+          className="fixed inset-0 z-100 flex items-center justify-center bg-base-100/95 backdrop-blur-md p-6 text-center"
         >
           {/* A fully blocking overlay to prevent interaction with stale UI */}
           <div className="absolute inset-0 z-0 pointer-events-auto" /> 

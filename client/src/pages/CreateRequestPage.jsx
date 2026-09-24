@@ -99,7 +99,7 @@ const CreateRequestPage = () => {
             
             <div className="w-full relative rounded-2xl overflow-hidden bg-base-200">
               <Suspense fallback={
-                <div className="h-[400px] flex flex-col items-center justify-center text-base-content/50">
+                <div className="h-100 flex flex-col items-center justify-center text-base-content/50">
                   <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
                   <p>Loading live map...</p>
                 </div>
@@ -108,7 +108,7 @@ const CreateRequestPage = () => {
                   hospitalLocation={formData.hospitalLocation}
                   donorLocations={successData.donorPins}
                   interactive={true}
-                  height="h-[400px]"
+                  height="h-100"
                 />
               </Suspense>
             </div>
@@ -290,7 +290,7 @@ const CreateRequestPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Hospital Location</span></label>
               <button 
                 type="button" 
-                className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-[0.98] ${formData.hospitalLocation ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.hospitalLocation ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                 onClick={handleGetLocation}
               >
                 <MapPin weight={formData.hospitalLocation ? "fill" : "regular"} className="w-5 h-5 mr-2" />
@@ -322,7 +322,7 @@ const CreateRequestPage = () => {
               transition={fieldDelay(5)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency Request'}
               </button>
             </motion.div>

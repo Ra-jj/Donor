@@ -149,7 +149,7 @@ const LoginPage = () => {
               transition={{ delay: 0.4, duration: 0.4 }}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : (
                   <>
                     <SignIn weight="bold" className="w-5 h-5 mr-1" />

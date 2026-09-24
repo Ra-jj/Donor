@@ -30,7 +30,7 @@ const ProfilePage = () => {
         ]);
         setStats(statsRes.data);
         setHistory(historyRes.data);
-      } catch (err) {
+      } catch {
         toast.error('Failed to load profile data');
       }
     };

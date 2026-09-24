@@ -265,7 +265,7 @@ const RegisterPage = () => {
               <div className="flex flex-col gap-3">
                 <button 
                   type="button" 
-                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-[0.98] ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                   onClick={handleGetLocation}
                 >
                   <MapPin weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
@@ -283,7 +283,7 @@ const RegisterPage = () => {
                   />
                   <button 
                     type="button" 
-                    className="btn btn-secondary rounded-xl font-bold active:scale-[0.98] transition-transform"
+                    className="btn btn-secondary rounded-xl font-bold active:scale-98 transition-transform"
                     onClick={async () => {
                       const query = document.getElementById('manual-location-input').value;
                       if (!query) return toast.error('Please enter a city name');
@@ -335,7 +335,7 @@ const RegisterPage = () => {
               transition={fieldDelay(6)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Create Account'}
               </button>
             </motion.div>

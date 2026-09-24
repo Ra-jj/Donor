@@ -131,7 +131,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col h-[calc(100vh-140px)] lg:h-[500px] border border-base-300 rounded-3xl bg-base-100 shadow-xl overflow-hidden shadow-base-content/5"
+      className="flex flex-col h-[calc(100vh-140px)] lg:h-125 border border-base-300 rounded-3xl bg-base-100 shadow-xl overflow-hidden shadow-base-content/5"
     >
       {/* Header */}
       <div className="bg-primary/5 border-b border-primary/10 text-base-content p-4 font-bold flex items-center gap-3">

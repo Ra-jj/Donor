@@ -28,7 +28,7 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
         onClick={() => req.status === 'accepted' && onSelect(req._id)}
         className={`card bg-base-100 shadow-md border overflow-hidden transition-colors ${
           req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'
-        } ${isSelected ? 'border-primary ring-2 ring-primary ring-opacity-50' : ''}`}
+        } ${isSelected ? 'border-primary ring-2 ring-primary/50' : ''}`}
       >
         {children}
       </motion.div>
@@ -504,12 +504,12 @@ const DashboardPage = () => {
                           <>
                             {req.hospitalLocation?.coordinates && (
                               <div className="w-full relative bg-base-200 border-b border-base-200 overflow-hidden">
-                                <Suspense fallback={<div className="h-[150px] flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
+                                <Suspense fallback={<div className="h-37.5 flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
                                   <DonorMap 
                                     hospitalLocation={req.hospitalLocation.coordinates} 
                                     interactive={false}
                                     userLocation={authUser?.location?.coordinates}
-                                    height="h-[150px]"
+                                    height="h-37.5"
                                   />
                                 </Suspense>
                               </div>
@@ -580,7 +580,7 @@ const DashboardPage = () => {
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.3, layout: { duration: 0.25 } }}
                         onClick={() => req.status === 'accepted' && setSelectedRequestId(req._id)}
-                        className={`card bg-base-100 shadow-md border transition-all ${req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'} ${selectedRequestId === req._id ? 'border-primary ring-2 ring-primary ring-opacity-50' : ''}`}
+                        className={`card bg-base-100 shadow-md border transition-all ${req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'} ${selectedRequestId === req._id ? 'border-primary ring-2 ring-primary/50' : ''}`}
                       >
                         <div className="card-body p-5">
                           <div className="flex justify-between items-start">
@@ -629,7 +629,7 @@ const DashboardPage = () => {
                                     <span className="text-sm font-semibold text-base-content/70">{req.rating}/5</span>
                                   </div>
                                   {req.ratingNote && (
-                                    <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-[150px]" title={req.ratingNote}>"{req.ratingNote}"</span>
+                                    <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-37.5" title={req.ratingNote}>"{req.ratingNote}"</span>
                                   )}
                                 </div>
                               ) : ratingRequestId === req._id ? (

@@ -71,10 +71,10 @@ const AnimatedStat = ({ value, label }) => (
 const ActivityRow = ({ activity, isNew }) => (
   <div
     className={`flex items-center gap-3 py-3 px-4 rounded-xl border transition-all duration-500 ${
-      isNew ? 'bg-primary/[0.03] border-primary/15' : 'bg-base-100 border-base-300/60'
+      isNew ? 'bg-primary/3 border-primary/15' : 'bg-base-100 border-base-300/60'
     }`}
   >
-    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
       <Drop weight="fill" className="w-4 h-4 text-primary" />
     </div>
     <div className="flex-1 min-w-0">
@@ -82,7 +82,7 @@ const ActivityRow = ({ activity, isNew }) => (
         <strong className="text-primary">{activity.bloodGroup}</strong> blood matched in {activity.location}
       </span>
     </div>
-    <span className="text-xs text-base-content/40 font-medium flex-shrink-0">{activity.time}</span>
+    <span className="text-xs text-base-content/40 font-medium shrink-0">{activity.time}</span>
   </div>
 );
 
@@ -120,9 +120,9 @@ const HomePage = () => {
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
             style={{ y: backgroundY }}
-            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.03] blur-3xl"
+            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-150 h-150 rounded-full bg-primary/3 blur-3xl"
           />
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-base-300 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-base-300 to-transparent" />
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto">
@@ -186,14 +186,14 @@ const HomePage = () => {
           >
             <Link 
               to="/register" 
-              className="group btn btn-primary btn-lg rounded-full w-full sm:w-auto px-8 text-white font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all active:scale-[0.98]"
+              className="group btn btn-primary btn-lg rounded-full w-full sm:w-auto px-8 text-white font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all active:scale-98"
             >
               Get Started
               <ArrowRight weight="bold" className="w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link 
               to="/login" 
-              className="btn btn-ghost btn-lg rounded-full w-full sm:w-auto px-8 font-semibold text-base-content/70 hover:text-base-content hover:bg-base-300/50 active:scale-[0.98] transition-transform"
+              className="btn btn-ghost btn-lg rounded-full w-full sm:w-auto px-8 font-semibold text-base-content/70 hover:text-base-content hover:bg-base-300/50 active:scale-98 transition-transform"
             >
               Log in
             </Link>
@@ -265,7 +265,7 @@ const HomePage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-80px" }}
                 transition={{ duration: 0.5, delay: index * 0.15 }}
-                className="group relative bg-base-100 p-8 rounded-2xl border border-base-300/60 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-300"
+                className="group relative bg-base-100 p-8 rounded-2xl border border-base-300/60 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/4 transition-all duration-300"
               >
                 {/* Step number */}
                 <div className="relative z-10 w-10 h-10 rounded-full bg-base-200 group-hover:bg-primary/10 flex items-center justify-center mb-6 transition-colors duration-300">
@@ -337,7 +337,7 @@ const HomePage = () => {
             className="bg-gradient-animated rounded-3xl p-12 md:p-16 text-center text-white relative overflow-hidden"
           >
             {/* Subtle pattern overlay */}
-            <div className="absolute inset-0 opacity-[0.04]" style={{
+            <div className="absolute inset-0 opacity-4" style={{
               backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
               backgroundSize: '24px 24px'
             }} />
@@ -352,7 +352,7 @@ const HomePage = () => {
               </p>
               <Link
                 to="/register"
-                className="group inline-flex justify-center items-center gap-2 w-full sm:w-auto bg-white text-primary font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg active:scale-[0.98]"
+                className="group inline-flex justify-center items-center gap-2 w-full sm:w-auto bg-white text-primary font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg active:scale-98"
               >
                 Create Free Account
                 <ArrowRight weight="bold" className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

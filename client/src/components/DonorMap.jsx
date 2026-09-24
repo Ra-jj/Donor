@@ -62,7 +62,7 @@ const DonorMap = ({
   searchRadiusKm = 15, 
   interactive = true, 
   userLocation = null,
-  height = "h-[400px]" 
+  height = "h-100" 
 }) => {
   if (!hospitalLocation || hospitalLocation.length !== 2) return null;
 
