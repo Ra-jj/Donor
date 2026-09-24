@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
-import { PaperPlaneRight, ChatCircleDots } from '@phosphor-icons/react';
+import { PaperPlaneRightIcon, ChatCircleDotsIcon } from '@phosphor-icons/react';
 
 const ChatWindow = ({ requestId, currentUserId }) => {
   const [messages, setMessages] = useState([]);
@@ -136,7 +136,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       {/* Header */}
       <div className="bg-primary/5 border-b border-primary/10 text-base-content p-4 font-bold flex items-center gap-3">
         <div className="bg-primary/20 text-primary p-2 rounded-full">
-          <ChatCircleDots weight="fill" className="w-6 h-6" />
+          <ChatCircleDotsIcon weight="fill" className="w-6 h-6" />
         </div>
         <span className="font-display text-lg tracking-tight">Coordination Chat</span>
       </div>
@@ -145,7 +145,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-base-100/50">
         {messages.length === 0 ? (
           <div className="text-center text-base-content/40 my-auto h-full flex flex-col items-center justify-center font-medium">
-            <ChatCircleDots weight="duotone" className="w-10 h-10 mb-3 text-base-content/15" />
+            <ChatCircleDotsIcon weight="duotone" className="w-10 h-10 mb-3 text-base-content/15" />
             <p className="text-sm">No messages yet.<br/>Send a message to coordinate!</p>
           </div>
         ) : (
@@ -188,7 +188,7 @@ const ChatWindow = ({ requestId, currentUserId }) => {
           whileTap={{ scale: 0.92 }}
           transition={{ duration: 0.1 }}
         >
-          <PaperPlaneRight weight="fill" className="w-5 h-5 text-white" />
+          <PaperPlaneRightIcon weight="fill" className="w-5 h-5 text-white" />
         </motion.button>
       </form>
     </motion.div>

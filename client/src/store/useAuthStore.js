@@ -15,7 +15,10 @@ export const useAuthStore = create((set) => ({
       initSocket(res.data.user._id);
       set({ authUser: res.data.user });
     } catch (error) {
-      console.error('Error in checkAuth:', error);
+      // 401 just means "not logged in", which is normal on public pages
+      if (error.response?.status !== 401) {
+        console.error('Error in checkAuth:', error);
+      }
       set({ authUser: null });
     } finally {
       set({ isCheckingAuth: false });

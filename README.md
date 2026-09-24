@@ -11,7 +11,7 @@ A real-time web application designed to connect people in need of critical suppl
 - **Coordination Chat:** Built-in real-time messaging between the requester and the matched donor to coordinate drop-offs.
 - **Fulfillment & Ratings Lifecycle:** Requesters can mark an accepted request as "Fulfilled" once the donation is complete, and submit a 5-star rating for the donor. 
 - **User Profiles & History:** Users can track their "Impact Stats" (lives saved, average rating) and view their historical requests and donations.
-- **Premium Custom UI & Dark Mode:** A beautifully customized interface featuring glassmorphism, Framer Motion animations, Phosphor Icons, and a user-toggled Dark Mode preference that persists via cookies.
+- **Premium Custom UI & Dark Mode:** A beautifully customized interface featuring glassmorphism, Motion animations, Phosphor Icons, and a user-toggled Dark Mode preference that persists via cookies.
 - **PWA & Offline Support:** Installable as a progressive web app. Features a fully-blocking offline overlay that prevents users from interacting with stale, broken forms during network drops in emergencies.
 - **Robust Security:** JWT-based authentication with HTTP-only cookies, password hashing, Zod schema validation for all endpoints, and API rate-limiting to prevent abuse.
 
@@ -20,7 +20,7 @@ A real-time web application designed to connect people in need of critical suppl
 - React 19 (Vite)
 - Zustand (State Management)
 - Tailwind CSS v4 & DaisyUI
-- Framer Motion (Animations)
+- Motion (Animations)
 - @phosphor-icons/react (Iconography)
 - Vite PWA Plugin (Offline caching)
 - Socket.io Client
@@ -56,6 +56,17 @@ MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_super_secret_jwt_key
 NODE_ENV=development
 CLIENT_URL=http://localhost:5173
+# Web push (generate a key pair with: npx web-push generate-vapid-keys)
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+For local development, point `MONGO_URI` at a separate development database, never the production one.
+
+The client needs a `.env` file in the `client` directory with the same public key, so browsers can subscribe to push notifications:
+```env
+VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
 ```
 
 Optional server variables:

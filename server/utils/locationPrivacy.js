@@ -110,7 +110,6 @@ const angularDistanceRadians = ([fromLongitude, fromLatitude], [toLongitude, toL
 };
 
 module.exports = {
-  PIN_DECIMAL_PLACES,
   PIN_CANDIDATE_MARGIN_KM,
   roundCoordinate,
   roundCoordinatePair,

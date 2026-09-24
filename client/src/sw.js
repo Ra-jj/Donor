@@ -6,7 +6,6 @@ precacheAndRoute(self.__WB_MANIFEST || []);
 self.addEventListener('push', (event) => {
   if (event.data) {
     const data = event.data.json();
-    console.log('Push notification received', data);
     
     const options = {
       body: data.body,

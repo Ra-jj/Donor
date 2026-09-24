@@ -72,7 +72,5 @@ const getCompatibleRecipientGroups = (donorGroup) => {
 module.exports = {
     isCompatibleDonor,
     getCompatibleDonorGroups,
-    getCompatibleRecipientGroups,
-    donorToRecipients,
-    recipientToDonors
+    getCompatibleRecipientGroups
 };

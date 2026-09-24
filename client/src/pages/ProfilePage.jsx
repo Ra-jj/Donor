@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
-import { UserCircle, ClockClockwise, MapTrifold } from '@phosphor-icons/react';
+import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon } from '@phosphor-icons/react';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
 
@@ -78,7 +78,7 @@ const ProfilePage = () => {
     <div className="space-y-8">
       <div className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-base-300">
         <h1 className="text-2xl font-display font-bold mb-6 flex items-center gap-2">
-          <UserCircle weight="duotone" className="w-8 h-8 text-primary" />
+          <UserCircleIcon weight="duotone" className="w-8 h-8 text-primary" />
           Edit Profile
         </h1>
         
@@ -122,7 +122,7 @@ const ProfilePage = () => {
                 disabled={locating}
                 className="btn btn-primary btn-outline rounded-xl"
               >
-                {locating ? <span className="loading loading-spinner loading-sm"></span> : <MapTrifold weight="bold" className="w-5 h-5" />}
+                {locating ? <span className="loading loading-spinner loading-sm"></span> : <MapTrifoldIcon weight="bold" className="w-5 h-5" />}
                 {formData.location ? 'Update' : 'Get Location'}
               </button>
             </div>
@@ -157,7 +157,7 @@ const ProfilePage = () => {
 
       <div className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-base-300">
         <h2 className="text-xl font-display font-bold mb-6 flex items-center gap-2">
-          <ClockClockwise weight="duotone" className="w-6 h-6 text-primary" />
+          <ClockClockwiseIcon weight="duotone" className="w-6 h-6 text-primary" />
           Donation History
         </h2>
         

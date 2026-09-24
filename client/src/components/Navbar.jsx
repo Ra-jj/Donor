@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Drop, SignOut, List, X, Sun, Moon } from '@phosphor-icons/react';
+import { DropIcon, SignOutIcon, ListIcon, XIcon, SunIcon, MoonIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -34,7 +34,7 @@ const Navbar = () => {
       >
         <div className="container mx-auto px-4 max-w-6xl flex justify-between items-center">
           <Link to="/" className="flex items-center gap-2 group">
-            <Drop weight="duotone" className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
+            <DropIcon weight="duotone" className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
             <span className="text-2xl font-display font-extrabold text-base-content tracking-tight">
               Donor
             </span>
@@ -64,7 +64,7 @@ const Navbar = () => {
                     </li>
                     <li className="p-1">
                       <button onClick={logout} className="text-error hover:bg-error/10 hover:text-error flex gap-3 py-3 rounded-xl font-semibold">
-                        <SignOut weight="regular" className="w-5 h-5" />
+                        <SignOutIcon weight="regular" className="w-5 h-5" />
                         Log out
                       </button>
                     </li>
@@ -84,9 +84,9 @@ const Navbar = () => {
                       transition={{ duration: 0.2 }}
                     >
                       {theme === 'light' ? (
-                        <Moon weight="duotone" className="w-5 h-5" />
+                        <MoonIcon weight="duotone" className="w-5 h-5" />
                       ) : (
-                        <Sun weight="duotone" className="w-5 h-5" />
+                        <SunIcon weight="duotone" className="w-5 h-5" />
                       )}
                     </motion.div>
                   </AnimatePresence>
@@ -108,9 +108,9 @@ const Navbar = () => {
                       transition={{ duration: 0.2 }}
                     >
                       {theme === 'light' ? (
-                        <Moon weight="duotone" className="w-5 h-5" />
+                        <MoonIcon weight="duotone" className="w-5 h-5" />
                       ) : (
-                        <Sun weight="duotone" className="w-5 h-5" />
+                        <SunIcon weight="duotone" className="w-5 h-5" />
                       )}
                     </motion.div>
                   </AnimatePresence>
@@ -126,7 +126,7 @@ const Navbar = () => {
             className="md:hidden btn btn-ghost btn-circle active:scale-95 transition-transform min-h-11 min-w-11"
             onClick={() => setMobileMenuOpen(true)}
           >
-            <List weight="regular" className="w-7 h-7" />
+            <ListIcon weight="regular" className="w-7 h-7" />
           </button>
         </div>
       </nav>
@@ -151,11 +151,11 @@ const Navbar = () => {
             >
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-2">
-                  <Drop weight="duotone" className="w-7 h-7 text-primary" />
+                  <DropIcon weight="duotone" className="w-7 h-7 text-primary" />
                   <span className="text-xl font-display font-extrabold text-base-content">Donor</span>
                 </div>
                 <button onClick={() => setMobileMenuOpen(false)} className="btn btn-ghost btn-circle btn-sm active:scale-95 transition-transform min-h-11 min-w-11">
-                  <X weight="regular" className="w-6 h-6" />
+                  <XIcon weight="regular" className="w-6 h-6" />
                 </button>
               </div>
 
@@ -179,14 +179,14 @@ const Navbar = () => {
                       className="btn btn-ghost justify-start font-semibold text-lg gap-3 active:scale-95 transition-transform min-h-11"
                     >
                       {theme === 'light' ? (
-                        <><Moon weight="duotone" className="w-5 h-5" /> Dark Mode</>
+                        <><MoonIcon weight="duotone" className="w-5 h-5" /> Dark Mode</>
                       ) : (
-                        <><Sun weight="duotone" className="w-5 h-5" /> Light Mode</>
+                        <><SunIcon weight="duotone" className="w-5 h-5" /> Light Mode</>
                       )}
                     </button>
                     <div className="divider my-2"></div>
                     <button onClick={logout} className="btn btn-error btn-outline mt-auto w-full font-bold gap-2 rounded-xl active:scale-95 transition-transform min-h-11">
-                      <SignOut weight="regular" className="w-5 h-5" />
+                      <SignOutIcon weight="regular" className="w-5 h-5" />
                       Log out
                     </button>
                   </>

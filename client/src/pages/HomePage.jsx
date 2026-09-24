@@ -2,36 +2,36 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { 
-  UserPlus, HandHeart, CheckCircle, ArrowRight, Drop, 
-  ShieldCheck, Lightning, ChatCircleDots, MapPin,
-  Heart, Heartbeat
+  UserPlusIcon, HandHeartIcon, CheckCircleIcon, ArrowRightIcon, DropIcon, 
+  ShieldCheckIcon, LightningIcon, ChatCircleDotsIcon, MapPinIcon,
+  HeartIcon, HeartbeatIcon
 } from '@phosphor-icons/react';
 
 /* ──────────────────────────────── DATA ──────────────────────────────── */
 
 const STEPS = [
   {
-    icon: UserPlus,
+    icon: UserPlusIcon,
     title: "Sign Up",
     description: "Create your account in seconds. We verify basic details to keep the platform secure."
   },
   {
-    icon: HandHeart,
+    icon: HandHeartIcon,
     title: "Request or Respond",
     description: "Hospitals broadcast critical needs. Compatible donors are notified instantly."
   },
   {
-    icon: CheckCircle,
+    icon: CheckCircleIcon,
     title: "Coordinate & Save",
     description: "Connect via real-time chat to coordinate the drop-off. It's that simple."
   }
 ];
 
 const TRUST_ITEMS = [
-  { icon: Lightning, label: "Real-time Matching" },
-  { icon: ShieldCheck, label: "Verified Donors" },
-  { icon: ChatCircleDots, label: "Encrypted Chat" },
-  { icon: MapPin, label: "15km Radius" },
+  { icon: LightningIcon, label: "Real-time Matching" },
+  { icon: ShieldCheckIcon, label: "Verified Donors" },
+  { icon: ChatCircleDotsIcon, label: "Encrypted Chat" },
+  { icon: MapPinIcon, label: "15km Radius" },
 ];
 
 const STATS = [
@@ -51,7 +51,7 @@ const LIVE_ACTIVITIES = [
 
 /* ──────────────────────────── COMPONENTS ─────────────────────────── */
 
-/** Animated counter that counts up from 0 */
+/** Stat that fades in once it scrolls into view */
 const AnimatedStat = ({ value, label }) => (
   <motion.div
     initial={{ opacity: 0, y: 16 }}
@@ -75,7 +75,7 @@ const ActivityRow = ({ activity, isNew }) => (
     }`}
   >
     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-      <Drop weight="fill" className="w-4 h-4 text-primary" />
+      <DropIcon weight="fill" className="w-4 h-4 text-primary" />
     </div>
     <div className="flex-1 min-w-0">
       <span className="text-sm font-medium text-base-content">
@@ -133,7 +133,7 @@ const HomePage = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-sm font-medium text-primary mb-8"
           >
-            <Heartbeat weight="fill" className="w-4 h-4" />
+            <HeartbeatIcon weight="fill" className="w-4 h-4" />
             <span>Saving lives, one match at a time</span>
           </motion.div>
 
@@ -189,7 +189,7 @@ const HomePage = () => {
               className="group btn btn-primary btn-lg rounded-full w-full sm:w-auto px-8 text-white font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all active:scale-98"
             >
               Get Started
-              <ArrowRight weight="bold" className="w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />
+              <ArrowRightIcon weight="bold" className="w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link 
               to="/login" 
@@ -343,7 +343,7 @@ const HomePage = () => {
             }} />
 
             <div className="relative z-10">
-              <Heart weight="fill" className="w-10 h-10 mx-auto mb-6 opacity-80" />
+              <HeartIcon weight="fill" className="w-10 h-10 mx-auto mb-6 opacity-80" />
               <h2 className="text-3xl md:text-4xl font-display font-extrabold tracking-tight mb-4">
                 Ready to make a difference?
               </h2>
@@ -355,7 +355,7 @@ const HomePage = () => {
                 className="group inline-flex justify-center items-center gap-2 w-full sm:w-auto bg-white text-primary font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg active:scale-98"
               >
                 Create Free Account
-                <ArrowRight weight="bold" className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRightIcon weight="bold" className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
           </motion.div>
@@ -367,7 +367,7 @@ const HomePage = () => {
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-2">
-              <Drop weight="duotone" className="w-6 h-6 text-primary" />
+              <DropIcon weight="duotone" className="w-6 h-6 text-primary" />
               <span className="text-lg font-display font-extrabold text-base-content tracking-tight">Donor</span>
             </div>
             
@@ -377,7 +377,7 @@ const HomePage = () => {
             </div>
 
             <p className="text-sm text-base-content/30 font-medium">
-              Made with <Heart weight="fill" className="w-3.5 h-3.5 text-primary inline-block mx-0.5" /> for those who give.
+              Made with <HeartIcon weight="fill" className="w-3.5 h-3.5 text-primary inline-block mx-0.5" /> for those who give.
             </p>
           </div>
         </div>

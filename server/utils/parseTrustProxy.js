@@ -34,4 +34,4 @@ const parseTrustProxy = (rawValue) => {
   return entries;
 };
 
-module.exports = { parseTrustProxy, DEFAULT_TRUST_PROXY };
+module.exports = { parseTrustProxy };

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { WifiSlash, WarningCircle } from '@phosphor-icons/react';
+import { WifiSlashIcon, WarningCircleIcon } from '@phosphor-icons/react';
 
 const OfflineOverlay = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -32,7 +32,7 @@ const OfflineOverlay = () => {
           
           <div className="relative z-10 max-w-md w-full bg-base-200 border border-base-300 rounded-3xl p-8 shadow-2xl flex flex-col items-center">
             <div className="w-20 h-20 bg-error/10 text-error rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <WifiSlash weight="duotone" className="w-10 h-10" />
+              <WifiSlashIcon weight="duotone" className="w-10 h-10" />
             </div>
             
             <h2 className="text-2xl font-display font-bold text-base-content mb-3">
@@ -44,7 +44,7 @@ const OfflineOverlay = () => {
             </p>
             
             <div className="bg-warning/10 border border-warning/20 p-4 rounded-xl flex items-start gap-3 text-left w-full">
-              <WarningCircle weight="fill" className="w-6 h-6 text-warning shrink-0 mt-0.5" />
+              <WarningCircleIcon weight="fill" className="w-6 h-6 text-warning shrink-0 mt-0.5" />
               <p className="text-sm text-warning-content/80">
                 Please reconnect to the internet to resume using the app. This page will automatically disappear once your connection is restored.
               </p>
