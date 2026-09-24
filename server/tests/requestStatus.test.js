@@ -169,7 +169,7 @@ describe('PATCH /api/requests/:id/status', () => {
       expect(stored.matchedDonorId).toBeNull();
     });
 
-    it('lets a compatible nearby donor accept (200) and marks them unavailable', async () => {
+    it('lets a compatible nearby donor accept (200) and leaves their own availability choice alone', async () => {
       const donor = await registerUser({ bloodGroup: 'O-' });
       const bloodRequest = await createBloodRequest(requester.id);
       const socket = spyOnSocket();
@@ -184,8 +184,9 @@ describe('PATCH /api/requests/:id/status', () => {
       const stored = await Request.findById(bloodRequest._id);
       expect(stored.status).toBe('accepted');
       expect(stored.matchedDonorId.toString()).toBe(donor.id);
+      // Busy is derived from the accepted request; the User document is never written
       const storedDonor = await User.findById(donor.id);
-      expect(storedDonor.isAvailable).toBe(false);
+      expect(storedDonor.isAvailable).toBe(true);
 
       expect(socket.to).toHaveBeenCalledWith(requester.id);
       expect(socket.emit).toHaveBeenCalledWith('requestStatusUpdate', expect.objectContaining({
@@ -239,13 +240,30 @@ describe('PATCH /api/requests/:id/status', () => {
       const statusCodes = responses.map((res) => res.statusCode).sort();
       expect(statusCodes).toEqual([200, 409]);
 
-      // The stored match must be the donor who got the 200, and only they are unavailable
+      // The stored match must be the donor who got the 200
       const winner = responses[0].statusCode === 200 ? donorA : donorB;
-      const loser = winner === donorA ? donorB : donorA;
       const stored = await Request.findById(bloodRequest._id);
       expect(stored.matchedDonorId.toString()).toBe(winner.id);
-      expect((await User.findById(winner.id)).isAvailable).toBe(false);
-      expect((await User.findById(loser.id)).isAvailable).toBe(true);
+    });
+
+    it('lets exactly one of eight concurrent donors accept (one 200, seven 409)', async () => {
+      const donors = [];
+      for (let i = 0; i < 8; i += 1) {
+        donors.push(await registerUser({ bloodGroup: 'O-' }));
+      }
+      const bloodRequest = await createBloodRequest(requester.id);
+
+      const responses = await Promise.all(
+        donors.map((donor) => patchStatus(bloodRequest._id, donor.cookie, 'accepted'))
+      );
+
+      const statusCodes = responses.map((res) => res.statusCode);
+      expect(statusCodes.filter((code) => code === 200)).toHaveLength(1);
+      expect(statusCodes.filter((code) => code === 409)).toHaveLength(7);
+      const winner = donors[statusCodes.indexOf(200)];
+      const stored = await Request.findById(bloodRequest._id);
+      expect(stored.status).toBe('accepted');
+      expect(stored.matchedDonorId.toString()).toBe(winner.id);
     });
 
     it('does not let a donor with an active donation accept another request (409)', async () => {
@@ -304,21 +322,21 @@ describe('PATCH /api/requests/:id/status', () => {
 
       expect(res.statusCode).toBe(200);
       expect((await Request.findById(secondRequest._id)).matchedDonorId.toString()).toBe(donor.id);
-      expect((await User.findById(donor.id)).isAvailable).toBe(false);
+      expect((await User.findById(donor.id)).isAvailable).toBe(true);
     });
 
-    it('sends no stale accept when the requester cancels right after the accept commits (409, donor available)', async () => {
+    it('sends no stale accept when the requester cancels right after the accept write (409)', async () => {
       const donor = await registerUser({ bloodGroup: 'O-' });
       const bloodRequest = await createBloodRequest(requester.id);
-      const realTransaction = mongoose.connection.transaction.bind(mongoose.connection);
+      const realFindOneAndUpdate = Request.findOneAndUpdate.bind(Request);
       let hasInjectedCancel = false;
       let cancelRes;
 
-      // With both writes in one transaction, the only gap left is between the accept's
-      // commit and its emit. Run the requester's whole cancel in exactly that gap.
-      // Flag set BEFORE awaiting so the cancel's own transaction cannot re-inject.
-      jest.spyOn(mongoose.connection, 'transaction').mockImplementation(async (fn, options) => {
-        const result = await realTransaction(fn, options);
+      // The only gap left is between the accept's write and its emit. Run the requester's
+      // whole cancel in exactly that gap. Flag set BEFORE awaiting so the cancel's own
+      // findOneAndUpdate cannot re-inject.
+      jest.spyOn(Request, 'findOneAndUpdate').mockImplementation(async (...args) => {
+        const result = await realFindOneAndUpdate(...args);
         if (!hasInjectedCancel) {
           hasInjectedCancel = true;
           cancelRes = await patchStatus(bloodRequest._id, requester.cookie, 'cancelled');
@@ -333,7 +351,6 @@ describe('PATCH /api/requests/:id/status', () => {
       expect(acceptRes.statusCode).toBe(409);
       expect(acceptRes.body.message).toBe('This request has already been cancelled');
       expect((await Request.findById(bloodRequest._id)).status).toBe('cancelled');
-      // The cancel's own transaction restored the donor in the same commit
       expect((await User.findById(donor.id)).isAvailable).toBe(true);
       // The requester must not get a stale 'accepted' event; the donor still hears about the cancel
       expect(socket.emit).not.toHaveBeenCalledWith(
@@ -342,33 +359,6 @@ describe('PATCH /api/requests/:id/status', () => {
       );
       expect(socket.to).toHaveBeenCalledWith(donor.id);
       expect(socket.emit).toHaveBeenCalledWith('requestStatusUpdate', expect.objectContaining({ status: 'cancelled' }));
-    });
-
-    it('serialises a cancel sent while the accept transaction is still open (donor ends available)', async () => {
-      const donor = await registerUser({ bloodGroup: 'O-' });
-      const bloodRequest = await createBloodRequest(requester.id);
-      const realFindByIdAndUpdate = User.findByIdAndUpdate.bind(User);
-      let cancelPromise;
-
-      // Send the cancel after the accept has written the request but before it commits.
-      // It is not awaited here: the cancel hits a write conflict on the request and the
-      // driver retries it until the accept commits, so awaiting it here would deadlock.
-      jest.spyOn(User, 'findByIdAndUpdate').mockImplementation(async (id, update, ...rest) => {
-        if (update && update.isAvailable === false && !cancelPromise) {
-          // .then() is what makes supertest actually send the request
-          cancelPromise = patchStatus(bloodRequest._id, requester.cookie, 'cancelled').then((res) => res);
-        }
-        return realFindByIdAndUpdate(id, update, ...rest);
-      });
-
-      const acceptRes = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
-      const cancelRes = await cancelPromise;
-
-      // The accept committed first; whether its response saw the cancel depends on timing
-      expect([200, 409]).toContain(acceptRes.statusCode);
-      expect(cancelRes.statusCode).toBe(200);
-      expect((await Request.findById(bloodRequest._id)).status).toBe('cancelled');
-      expect((await User.findById(donor.id)).isAvailable).toBe(true);
     });
   });
 
@@ -385,12 +375,11 @@ describe('PATCH /api/requests/:id/status', () => {
       expect(stored.status).toBe('pending');
     });
 
-    it('lets the requester cancel an accepted request (200) and frees the donor', async () => {
+    it('lets the requester cancel an accepted request (200) and notifies the donor', async () => {
       const donor = await registerUser({ bloodGroup: 'O-' });
       const bloodRequest = await createBloodRequest(requester.id);
       const acceptRes = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
       expect(acceptRes.statusCode).toBe(200);
-      expect((await User.findById(donor.id)).isAvailable).toBe(false);
 
       const socket = spyOnSocket();
       const res = await patchStatus(bloodRequest._id, requester.cookie, 'cancelled');
@@ -471,85 +460,6 @@ describe('PATCH /api/requests/:id/status', () => {
   });
 });
 
-describe('request and donor writes commit together or not at all', () => {
-  let requester;
-  let donor;
-  let consoleErrorSpy;
-
-  beforeEach(async () => {
-    requester = await registerUser({ name: 'Requester', bloodGroup: 'B+', location: HOSPITAL });
-    donor = await registerUser({ bloodGroup: 'O-' });
-    // The controller logs the simulated failure; keep the test output clean but still check it
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  // Makes the donor availability write fail inside the transaction, after the request write
-  const failDonorWriteSetting = (isAvailable) => {
-    const realFindByIdAndUpdate = User.findByIdAndUpdate.bind(User);
-    jest.spyOn(User, 'findByIdAndUpdate').mockImplementation(async (id, update, ...rest) => {
-      if (update && update.isAvailable === isAvailable) {
-        throw new Error('Simulated donor write failure');
-      }
-      return realFindByIdAndUpdate(id, update, ...rest);
-    });
-  };
-
-  const acceptThroughApi = async (bloodRequest) => {
-    const res = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
-    expect(res.statusCode).toBe(200);
-  };
-
-  it('rolls back the accept when the donor write fails (500, still pending, no event)', async () => {
-    const bloodRequest = await createBloodRequest(requester.id);
-    failDonorWriteSetting(false);
-    const socket = spyOnSocket();
-
-    const res = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
-
-    expect(res.statusCode).toBe(500);
-    const stored = await Request.findById(bloodRequest._id);
-    expect(stored.status).toBe('pending');
-    expect(stored.matchedDonorId).toBeNull();
-    expect((await User.findById(donor.id)).isAvailable).toBe(true);
-    expect(socket.to).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in updateRequestStatus:', 'Simulated donor write failure');
-  });
-
-  it('rolls back the cancel when the donor write fails (500, still accepted, no event)', async () => {
-    const bloodRequest = await createBloodRequest(requester.id);
-    await acceptThroughApi(bloodRequest);
-    failDonorWriteSetting(true);
-    const socket = spyOnSocket();
-
-    const res = await patchStatus(bloodRequest._id, requester.cookie, 'cancelled');
-
-    expect(res.statusCode).toBe(500);
-    const stored = await Request.findById(bloodRequest._id);
-    expect(stored.status).toBe('accepted');
-    expect(stored.matchedDonorId.toString()).toBe(donor.id);
-    expect((await User.findById(donor.id)).isAvailable).toBe(false);
-    expect(socket.to).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in updateRequestStatus:', 'Simulated donor write failure');
-  });
-
-  it('rolls back the fulfil when the donor write fails (500, still accepted, no event)', async () => {
-    const bloodRequest = await createBloodRequest(requester.id);
-    await acceptThroughApi(bloodRequest);
-    failDonorWriteSetting(true);
-    const socket = spyOnSocket();
-
-    const res = await patchFulfill(bloodRequest._id, requester.cookie);
-
-    expect(res.statusCode).toBe(500);
-    const stored = await Request.findById(bloodRequest._id);
-    expect(stored.status).toBe('accepted');
-    expect(stored.fulfilledAt).toBeNull();
-    expect((await User.findById(donor.id)).isAvailable).toBe(false);
-    expect(socket.to).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in fulfillRequest:', 'Simulated donor write failure');
-  });
-});
-
 describe('PATCH /api/requests/:id/fulfill', () => {
   let requester;
   let donor;
@@ -564,7 +474,7 @@ describe('PATCH /api/requests/:id/fulfill', () => {
     expect(acceptRes.statusCode).toBe(200);
   });
 
-  it('lets the requester fulfil an accepted request (200) and frees the donor', async () => {
+  it('lets the requester fulfil an accepted request (200) and notifies the donor', async () => {
     const socket = spyOnSocket();
 
     const res = await patchFulfill(bloodRequest._id, requester.cookie);
@@ -646,5 +556,125 @@ describe('PATCH /api/requests/:id/fulfill', () => {
 
     expect(res.statusCode).toBe(404);
     expect(res.body.message).toBe('Request not found');
+  });
+});
+
+describe('isAvailable is only the donor\'s choice; busy is derived from an accepted request', () => {
+  let requester;
+
+  beforeEach(async () => {
+    requester = await registerUser({ name: 'Requester', bloodGroup: 'B+', location: HOSPITAL });
+  });
+
+  // At most two creates per test, from a fresh requester, so the 5-per-user limiter never trips
+  const postBloodRequest = (cookie) =>
+    request(server)
+      .post('/api/requests')
+      .set('Cookie', cookie)
+      .send({ bloodGroup: 'B+', unitsNeeded: 1, hospitalName: 'Match Hospital', hospitalLocation: HOSPITAL });
+
+  const setAvailability = (cookie, isAvailable) =>
+    request(server).patch('/api/users/profile').set('Cookie', cookie).send({ isAvailable });
+
+  const getIncoming = (cookie) => request(server).get('/api/requests/incoming').set('Cookie', cookie);
+
+  // Creates a request through the API and reports who got the newBloodRequest event and the count
+  const createAndSeeWhoMatched = async () => {
+    const socket = spyOnSocket();
+    const res = await postBloodRequest(requester.cookie);
+    expect(res.statusCode).toBe(201);
+    const notifiedRooms = socket.to.mock.calls
+      .filter((call, index) => socket.emit.mock.calls[index][0] === 'newBloodRequest')
+      .map(([room]) => room);
+    socket.to.mockRestore();
+    return { notifiedRooms, matchedDonorCount: res.body.matchedDonorCount };
+  };
+
+  it('neither notifies nor counts a busy donor whose isAvailable is still true', async () => {
+    const busyDonor = await registerUser({ bloodGroup: 'O-' });
+    const freeDonor = await registerUser({ bloodGroup: 'O-' });
+    const heldRequest = await createBloodRequest(requester.id);
+    expect((await patchStatus(heldRequest._id, busyDonor.cookie, 'accepted')).statusCode).toBe(200);
+    expect((await User.findById(busyDonor.id)).isAvailable).toBe(true);
+
+    const { notifiedRooms, matchedDonorCount } = await createAndSeeWhoMatched();
+
+    // The requester (B+, at the hospital) is compatible too, so this also proves the
+    // combined $nin still excludes them
+    expect(notifiedRooms).toEqual([freeDonor.id]);
+    expect(matchedDonorCount).toBe(1);
+  });
+
+  it.each(['cancelled', 'fulfilled'])('keeps a donor who opted out opted out after their donation is %s', async (outcome) => {
+    const donor = await registerUser({ bloodGroup: 'O-' });
+    expect((await setAvailability(donor.cookie, false)).statusCode).toBe(200);
+    const heldRequest = await createBloodRequest(requester.id);
+    expect((await patchStatus(heldRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+
+    const endRes = outcome === 'fulfilled'
+      ? await patchFulfill(heldRequest._id, requester.cookie)
+      : await patchStatus(heldRequest._id, requester.cookie, 'cancelled');
+    expect(endRes.statusCode).toBe(200);
+
+    expect((await User.findById(donor.id)).isAvailable).toBe(false);
+    const { notifiedRooms, matchedDonorCount } = await createAndSeeWhoMatched();
+    expect(notifiedRooms).toEqual([]);
+    expect(matchedDonorCount).toBe(0);
+  });
+
+  it.each(['cancelled', 'fulfilled'])('matches an opted-in donor again once their donation is %s', async (outcome) => {
+    const donor = await registerUser({ bloodGroup: 'O-' });
+    const heldRequest = await createBloodRequest(requester.id);
+    expect((await patchStatus(heldRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+
+    const whileBusy = await createAndSeeWhoMatched();
+    expect(whileBusy.notifiedRooms).toEqual([]);
+    expect(whileBusy.matchedDonorCount).toBe(0);
+
+    const endRes = outcome === 'fulfilled'
+      ? await patchFulfill(heldRequest._id, requester.cookie)
+      : await patchStatus(heldRequest._id, requester.cookie, 'cancelled');
+    expect(endRes.statusCode).toBe(200);
+
+    const afterwards = await createAndSeeWhoMatched();
+    expect(afterwards.notifiedRooms).toEqual([donor.id]);
+    expect(afterwards.matchedDonorCount).toBe(1);
+  });
+
+  it('does not make a busy donor matchable when they toggle isAvailable to true in their profile', async () => {
+    const donor = await registerUser({ bloodGroup: 'O-' });
+    expect((await setAvailability(donor.cookie, false)).statusCode).toBe(200);
+    const heldRequest = await createBloodRequest(requester.id);
+    expect((await patchStatus(heldRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+
+    const toggleRes = await setAvailability(donor.cookie, true);
+
+    expect(toggleRes.statusCode).toBe(200);
+    expect(toggleRes.body.user.isAvailable).toBe(true);
+    expect(toggleRes.body.user).not.toHaveProperty('password');
+    const { notifiedRooms, matchedDonorCount } = await createAndSeeWhoMatched();
+    expect(notifiedRooms).toEqual([]);
+    expect(matchedDonorCount).toBe(0);
+  });
+
+  it('reports hasActiveDonation only while the donor holds an accepted request', async () => {
+    const donor = await registerUser({ bloodGroup: 'O-' });
+    const otherDonor = await registerUser({ bloodGroup: 'O-' });
+    const heldRequest = await createBloodRequest(requester.id);
+
+    const before = await getIncoming(donor.cookie);
+    expect(before.statusCode).toBe(200);
+    expect(before.body.hasActiveDonation).toBe(false);
+
+    expect((await patchStatus(heldRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+    expect((await getIncoming(donor.cookie)).body.hasActiveDonation).toBe(true);
+    // Someone else's accepted request does not make this donor busy
+    expect((await getIncoming(otherDonor.cookie)).body.hasActiveDonation).toBe(false);
+
+    expect((await patchFulfill(heldRequest._id, requester.cookie)).statusCode).toBe(200);
+    const after = await getIncoming(donor.cookie);
+    expect(after.body.hasActiveDonation).toBe(false);
+    // The fulfilled request is still listed for the thank-you card, but no longer counts
+    expect(after.body.incomingRequests.map((r) => r.status)).toEqual(['fulfilled']);
   });
 });

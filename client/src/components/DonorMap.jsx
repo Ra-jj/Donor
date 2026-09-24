@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
 // Custom hospital pin (MapPinPlus style)
@@ -41,6 +41,21 @@ const userIcon = L.divIcon({
   popupAnchor: [0, -28]
 });
 
+// Leaflet measures its container only when it is created, so a map mounted while its card
+// was still animating or hidden draws grey tiles. Re-measure whenever the container resizes.
+const InvalidateSizeOnResize = () => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+
+  return null;
+};
+
 const DonorMap = ({ 
   hospitalLocation, 
   donorLocations = [], 
@@ -70,6 +85,7 @@ const DonorMap = ({
         doubleClickZoom={interactive}
         className="w-full h-full"
       >
+        <InvalidateSizeOnResize />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"

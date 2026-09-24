@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { io } = require('../lib/socket');
@@ -62,11 +61,16 @@ exports.createRequest = async (req, res) => {
     // Find all donors whose blood group is compatible with the requested blood group
     const compatibleDonorGroups = getCompatibleDonorGroups(bloodGroup);
 
-    // One query over the wider radius; both donor lists below are filtered from it in JS.
+    // Busy donors already hold an accepted request, so they are left out even when their own
+    // isAvailable choice is true. one_active_donation_per_donor keeps this to one per donor.
+    const busyDonorIds = await Request.distinct('matchedDonorId', { status: 'accepted' });
+
+    // One query over the wider radius; both donor lists below are filtered from it in JS, so
+    // leaving busy donors out here keeps them out of the notify list AND the count and pins.
     // Select only what this handler uses: _id for the socket room, bloodGroup for exact vs
     // compatible, pushSubscription for the push, and location for the two distance checks.
     const candidateDonors = await User.find({
-      _id: { $ne: requesterId }, // Exclude the requester themselves
+      _id: { $nin: [...busyDonorIds, requesterId] }, // Exclude busy donors and the requester
       bloodGroup: { $in: compatibleDonorGroups },
       isAvailable: true,
       location: {
@@ -196,7 +200,13 @@ exports.getIncomingRequests = async (req, res) => {
       return reqObj;
     });
 
-    res.status(200).json({ incomingRequests });
+    // Busy = holding an accepted request. The second $or branch above has no radius or
+    // blood-group filter, so that request is always in this list when it exists.
+    const hasActiveDonation = rawIncomingRequests.some(
+      (reqDoc) => reqDoc.status === 'accepted' && String(reqDoc.matchedDonorId) === String(donor._id)
+    );
+
+    res.status(200).json({ incomingRequests, hasActiveDonation });
   } catch (error) {
     console.error('Error in getIncomingRequests:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -214,37 +224,26 @@ const acceptRequest = async (req, res) => {
   const donor = req.user;
   const requestId = req.params.id;
 
-  // The request write and the donor write commit together or not at all. Every eligibility
-  // rule lives in the filter of the request write, so if two donors accept at the same
-  // moment only the first can still match status: 'pending'; the other hits a write
-  // conflict, the driver retries it, and it then matches nothing.
+  // One atomic write on one document, so no transaction is needed. The donor's User is not
+  // written: holding this accepted request is what makes them busy (see createRequest).
+  // Every eligibility rule lives in the filter, so if two donors accept at the same moment
+  // only the first can still match status: 'pending' and the other matches nothing.
   let request;
   try {
-    request = await mongoose.connection.transaction(async (session) => {
-      const acceptedRequest = await Request.findOneAndUpdate(
-        {
-          _id: requestId,
-          status: 'pending',
-          requesterId: { $ne: donor._id },
-          bloodGroup: { $in: getCompatibleRecipientGroups(donor.bloodGroup) },
-          hospitalLocation: withinDonorRadius(donor),
-        },
-        { $set: { status: 'accepted', matchedDonorId: donor._id } },
-        { returnDocument: 'after', session }
-      );
-      // Nothing matched: no donor write, and the empty transaction just commits
-      if (!acceptedRequest) {
-        return null;
-      }
-
-      // Take the donor out of the matching pool until the request is fulfilled or cancelled
-      await User.findByIdAndUpdate(donor._id, { isAvailable: false }, { session });
-      return acceptedRequest;
-    });
+    request = await Request.findOneAndUpdate(
+      {
+        _id: requestId,
+        status: 'pending',
+        requesterId: { $ne: donor._id },
+        bloodGroup: { $in: getCompatibleRecipientGroups(donor.bloodGroup) },
+        hospitalLocation: withinDonorRadius(donor),
+      },
+      { $set: { status: 'accepted', matchedDonorId: donor._id } },
+      { returnDocument: 'after' }
+    );
   } catch (error) {
     // The one_active_donation_per_donor unique index (request.model.js) rejected the write:
     // this donor already has an accepted request, even if both accepts were sent at once.
-    // E11000 has no TransientTransactionError label, so the driver does not retry it.
     if (error.code === 11000) {
       return res.status(409).json({
         message: 'You already have an active donation. Complete or wait for it to be cancelled before accepting another.',
@@ -287,10 +286,9 @@ const acceptRequest = async (req, res) => {
     return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
   }
 
-  // Events go out only after the commit: the driver may re-run the transaction callback.
-  // A cancel or fulfil can still commit between our commit and this emit, so re-read to
-  // avoid sending the requester a stale 'accepted'. No availability undo is needed here:
-  // those transactions restore the donor in the same commit that changes the request.
+  // A cancel or fulfil can still land between our write and this emit, so re-read to avoid
+  // sending the requester a stale 'accepted'. Nothing else needs undoing: the accept wrote
+  // only the request, and the cancel or fulfil already changed it.
   const current = await Request.findById(request._id).select('status matchedDonorId');
   const isStillMatched =
     current && current.status === 'accepted' && String(current.matchedDonorId) === String(donor._id);
@@ -342,25 +340,18 @@ const cancelRequest = async (req, res) => {
   const requester = req.user;
   const requestId = req.params.id;
 
-  // Only the requester can cancel, and only while the request is still open.
-  // The request write and the donor write commit together or not at all.
-  const request = await mongoose.connection.transaction(async (session) => {
-    const cancelledRequest = await Request.findOneAndUpdate(
-      {
-        _id: requestId,
-        requesterId: requester._id,
-        status: { $in: ['pending', 'accepted'] },
-      },
-      { $set: { status: 'cancelled' } },
-      { returnDocument: 'after', session }
-    );
-
-    // Accepting marked the donor unavailable, so give them back to the matching pool
-    if (cancelledRequest && cancelledRequest.matchedDonorId) {
-      await User.findByIdAndUpdate(cancelledRequest.matchedDonorId, { isAvailable: true }, { session });
-    }
-    return cancelledRequest;
-  });
+  // Only the requester can cancel, and only while the request is still open. One atomic
+  // write: leaving 'accepted' is what frees the donor, and their own isAvailable choice
+  // is left exactly as they set it.
+  const request = await Request.findOneAndUpdate(
+    {
+      _id: requestId,
+      requesterId: requester._id,
+      status: { $in: ['pending', 'accepted'] },
+    },
+    { $set: { status: 'cancelled' } },
+    { returnDocument: 'after' }
+  );
 
   if (!request) {
     const existing = await Request.findById(requestId);
@@ -373,7 +364,7 @@ const cancelRequest = async (req, res) => {
     return res.status(409).json({ message: `This request has already been ${existing.status}` });
   }
 
-  // Notify the donor only after the commit: the driver may re-run the transaction callback
+  // Notify the donor only after the write has succeeded
   if (request.matchedDonorId) {
     io.to(request.matchedDonorId.toString()).emit('requestStatusUpdate', {
       requestId: request._id,
@@ -409,20 +400,13 @@ exports.updateRequestStatus = async (req, res) => {
 exports.fulfillRequest = async (req, res) => {
   try {
     // The status filter is part of the write, so a fulfil cannot overwrite a cancel that
-    // landed a moment earlier. The request write and the donor write commit together.
-    const request = await mongoose.connection.transaction(async (session) => {
-      const fulfilledRequest = await Request.findOneAndUpdate(
-        { _id: req.params.id, requesterId: req.user._id, status: 'accepted' },
-        { $set: { status: 'fulfilled', fulfilledAt: new Date() } },
-        { returnDocument: 'after', session }
-      );
-
-      // Restore donor availability so they can accept future requests
-      if (fulfilledRequest && fulfilledRequest.matchedDonorId) {
-        await User.findByIdAndUpdate(fulfilledRequest.matchedDonorId, { isAvailable: true }, { session });
-      }
-      return fulfilledRequest;
-    });
+    // landed a moment earlier. One atomic write: leaving 'accepted' is what frees the donor,
+    // and their own isAvailable choice is left exactly as they set it.
+    const request = await Request.findOneAndUpdate(
+      { _id: req.params.id, requesterId: req.user._id, status: 'accepted' },
+      { $set: { status: 'fulfilled', fulfilledAt: new Date() } },
+      { returnDocument: 'after' }
+    );
 
     if (!request) {
       // The write matched nothing: read the request to report which rule failed
@@ -439,9 +423,8 @@ exports.fulfillRequest = async (req, res) => {
       return res.status(400).json({ message: 'Only accepted requests can be marked as fulfilled' });
     }
 
-    // Notify the donor only after the commit (the driver may re-run the transaction callback).
-    // Inside the guard: the write has already committed, so a null matchedDonorId must not
-    // turn a successful fulfil into a 500.
+    // Notify the donor only after the write has succeeded. Inside the guard: the write has
+    // already happened, so a null matchedDonorId must not turn a successful fulfil into a 500.
     if (request.matchedDonorId) {
       io.to(request.matchedDonorId.toString()).emit('requestStatusUpdate', {
         requestId: request._id,

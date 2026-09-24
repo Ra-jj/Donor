@@ -47,6 +47,9 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // ONLY the donor's own choice, set from the Profile toggle. Nothing else writes it.
+    // "Busy" is derived, never stored here: a donor holding a Request with status 'accepted'
+    // and matchedDonorId set to them is busy, and createRequest skips them even when this is true.
     isAvailable: {
       type: Boolean,
       default: true,

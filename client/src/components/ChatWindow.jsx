@@ -45,14 +45,35 @@ const ChatWindow = ({ requestId, currentUserId }) => {
     const handleNewMessage = (newMessage) => {
       // Only append if the message belongs to this specific chat request
       if (newMessage.requestId === requestId) {
-        setMessages((prev) => [...prev, newMessage]);
+        // Skip it if a reconnect refetch already added this message
+        setMessages((prev) => (prev.some((m) => m._id === newMessage._id) ? prev : [...prev, newMessage]));
       }
     };
 
+    // Messages sent while offline are not replayed, so refetch quietly on reconnect. Keep
+    // local messages the server list lacks (an unsent optimistic one has a temporary _id).
+    let isCurrent = true;
+    const handleReconnect = () => {
+      axiosInstance
+        .get(`/messages/${requestId}`)
+        .then((response) => {
+          if (!isCurrent) return; // the chat switched to another request meanwhile
+          const serverMessages = response.data.messages;
+          setMessages((prev) => {
+            const serverIds = new Set(serverMessages.map((msg) => msg._id));
+            return [...serverMessages, ...prev.filter((msg) => !serverIds.has(msg._id))];
+          });
+        })
+        .catch(() => {});
+    };
+
     socket.on('newMessage', handleNewMessage);
+    socket.io.on('reconnect', handleReconnect);
 
     return () => {
+      isCurrent = false;
       socket.off('newMessage', handleNewMessage);
+      socket.io.off('reconnect', handleReconnect);
     };
   }, [requestId]);
 
@@ -75,7 +96,15 @@ const ChatWindow = ({ requestId, currentUserId }) => {
 
     // 2. Actually send to server
     try {
-      await axiosInstance.post(`/messages/send/${requestId}`, { text: messageToSend });
+      const response = await axiosInstance.post(`/messages/send/${requestId}`, { text: messageToSend });
+      // Swap in the saved message so its real _id lets a reconnect refetch dedupe it.
+      // If a refetch already brought it in, just drop the optimistic copy.
+      const savedMessage = response.data.newMessage;
+      if (savedMessage && savedMessage._id) {
+        setMessages((prev) => (prev.some((msg) => msg._id === savedMessage._id)
+          ? prev.filter((msg) => msg._id !== optimisticMessage._id)
+          : prev.map((msg) => (msg._id === optimisticMessage._id ? savedMessage : msg))));
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
