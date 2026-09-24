@@ -2,15 +2,20 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/user.model');
 const protectRoute = require('../middleware/auth.middleware');
+const validate = require('../middleware/validate.middleware');
+const { pushSubscriptionSchema } = require('../validators/pushValidator');
 
-// Save the push subscription for the logged-in user
-router.post('/subscribe', protectRoute, async (req, res) => {
+// Save the push subscription for the logged-in user. validate() has already checked the
+// endpoint host against the push-service allowlist and the key lengths.
+router.post('/subscribe', protectRoute, validate(pushSubscriptionSchema), async (req, res) => {
   try {
-    const subscription = req.body;
-    
-    if (!subscription || !subscription.endpoint) {
-      return res.status(400).json({ message: 'Invalid subscription object' });
-    }
+    // Only the validated fields are stored, never the raw request body
+    const { endpoint, expirationTime, keys } = req.body;
+    const subscription = {
+      endpoint,
+      expirationTime: expirationTime ?? null,
+      keys: { p256dh: keys.p256dh, auth: keys.auth },
+    };
 
     const user = await User.findById(req.user._id);
     if (!user) {

@@ -34,7 +34,54 @@ const requestLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const REGISTER_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+// Deliberately loose: mobile carriers in India put many users behind one IP (CGNAT)
+const DEFAULT_REGISTER_LIMIT = 10;
+
+/**
+ * Works out the sign-up limiter's settings from the environment, once, at module load.
+ *
+ * - REGISTER_RATE_LIMIT_MAX set: that many sign-ups per IP per hour (must be a positive integer).
+ * - Not set, NODE_ENV === 'test': skipped. Jest sets NODE_ENV=test, and test files register
+ *   many users from 127.0.0.1. A test that sets REGISTER_RATE_LIMIT_MAX still gets the limiter.
+ * - Not set otherwise (production, development): DEFAULT_REGISTER_LIMIT.
+ */
+const resolveRegisterLimitConfig = (env) => {
+  const rawLimit = env.REGISTER_RATE_LIMIT_MAX;
+  if (rawLimit === undefined || rawLimit === '') {
+    return { limit: DEFAULT_REGISTER_LIMIT, skip: env.NODE_ENV === 'test' };
+  }
+  if (!/^\d+$/.test(rawLimit.trim()) || Number(rawLimit) < 1) {
+    throw new Error(
+      `REGISTER_RATE_LIMIT_MAX must be a positive integer, got ${JSON.stringify(rawLimit)}`
+    );
+  }
+  return { limit: Number(rawLimit), skip: false };
+};
+
+const registerLimitConfig = resolveRegisterLimitConfig(process.env);
+
+/**
+ * Limit account creation per IP address, to slow down scripted sign-ups and email probing.
+ * Every attempt counts, including ones that fail validation or hit an existing email.
+ */
+const registerLimiter = rateLimit({
+  windowMs: REGISTER_WINDOW_MS,
+  limit: registerLimitConfig.limit,
+  skip: () => registerLimitConfig.skip,
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many accounts created from this network. Please try again later.',
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   loginLimiter,
   requestLimiter,
+  registerLimiter,
+  resolveRegisterLimitConfig,
+  DEFAULT_REGISTER_LIMIT,
 };

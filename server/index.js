@@ -8,9 +8,19 @@ const requestRoutes = require('./routes/request.route');
 const messageRoutes = require('./routes/message.route');
 const pushRoutes = require('./routes/push.route');
 const userRoutes = require('./routes/user.route');
+const { createSecurityHeaders } = require('./middleware/securityHeaders');
+const { parseTrustProxy } = require('./utils/parseTrustProxy');
 const { app, server } = require('./lib/socket');
 
 const PORT = process.env.PORT || 8000;
+const isProduction = process.env.NODE_ENV === 'production';
+
+// req.ip, and so every per-IP rate limit, comes from X-Forwarded-For only for the hops trusted
+// here. Default 1 hop; TRUST_PROXY overrides it (see README). Check it after a deploy with
+// DEBUG_IP_ENDPOINT=1 and GET /api/debug/ip.
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
+app.disable('x-powered-by');
+app.use(createSecurityHeaders({ isProduction }));
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true })); // Set correct cors origin for cookies
 app.use(express.json());
@@ -28,7 +38,21 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Donor API is running' });
 });
 
-if (process.env.NODE_ENV === "production") {
+// Opt-in diagnostic for the trust proxy setting: shows which address Express picked as req.ip
+// from the forwarding chain. Registered only when DEBUG_IP_ENDPOINT is exactly '1'; it echoes
+// the client's forwarding headers, so turn it off again once the hop count is confirmed.
+if (process.env.DEBUG_IP_ENDPOINT === '1') {
+  app.get('/api/debug/ip', (req, res) => {
+    res.json({ ip: req.ip, ips: req.ips, xff: req.headers['x-forwarded-for'] });
+  });
+}
+
+// Unknown API paths get a JSON 404 instead of falling through to the SPA's index.html
+app.use('/api', (_req, res) => {
+  res.status(404).json({ message: 'Not found' });
+});
+
+if (isProduction) {
   app.use(express.static(path.join(__dirname, "../client/dist")));
 
   app.use((req, res) => {

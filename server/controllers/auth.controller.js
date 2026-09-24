@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const User = require('../models/user.model');
 const generateTokenAndSetCookie = require('../utils/generateToken');
+const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
 
 exports.register = async (req, res) => {
   try {
@@ -94,7 +95,8 @@ exports.login = async (req, res) => {
 
 exports.logout = (req, res) => {
   try {
-    res.cookie('jwt', '', { maxAge: 0 });
+    // Same attributes as the login cookie, so the browser matches and removes it
+    res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error('Error in logout controller:', error.message);

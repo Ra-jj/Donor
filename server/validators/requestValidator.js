@@ -6,12 +6,14 @@ const URGENCIES = ['low', 'medium', 'high'];
 // which checks that the caller is the requester.
 const STATUS_UPDATES = ['accepted', 'declined', 'cancelled'];
 
+// Zod 4 takes a custom message through `error`. The Zod 3 params `errorMap` and
+// `invalid_type_error` are silently ignored, so they never produced these messages.
 const createRequestSchema = z.object({
   bloodGroup: z.enum(BLOOD_GROUPS, {
-    errorMap: () => ({ message: 'Invalid blood group' }),
+    error: 'Invalid blood group',
   }),
   unitsNeeded: z
-    .number({ invalid_type_error: 'Units needed must be a number' })
+    .number({ error: 'Units needed must be a number' })
     .int('Units needed must be a whole number')
     .min(1, 'At least 1 unit is required')
     .max(20, 'Maximum 20 units can be requested at once'),
@@ -26,13 +28,13 @@ const createRequestSchema = z.object({
       message: 'Invalid latitude',
     }),
   urgency: z.enum(URGENCIES, {
-    errorMap: () => ({ message: 'Urgency must be low, medium, or high' }),
+    error: 'Urgency must be low, medium, or high',
   }).optional().default('medium'),
 });
 
 const rateRequestSchema = z.object({
   rating: z
-    .number({ invalid_type_error: 'Rating must be a number' })
+    .number({ error: 'Rating must be a number' })
     .int('Rating must be a whole number')
     .min(1, 'Rating must be at least 1')
     .max(5, 'Rating cannot exceed 5'),

@@ -129,7 +129,7 @@ const ProfilePage = () => {
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <label className="cursor-pointer label bg-base-200 p-4 rounded-xl flex items-start gap-4">
+            <label className="cursor-pointer label whitespace-normal bg-base-200 p-4 rounded-xl flex items-start gap-4">
               <input 
                 type="checkbox" 
                 className="toggle toggle-primary toggle-lg mt-1" 
