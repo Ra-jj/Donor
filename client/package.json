@@ -12,24 +12,24 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.3",
-    "@vitejs/plugin-react": "^6.0.4",
-    "axios": "^1.19.0",
-    "daisyui": "^5.7.16",
+    "@vitejs/plugin-react": "^6.1.1",
+    "axios": "^1.20.0",
+    "daisyui": "^5.7.43",
     "leaflet": "^1.9.4",
-    "motion": "^13.1.1",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-hot-toast": "^2.6.0",
+    "motion": "^13.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-hot-toast": "^2.6.1",
     "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.18.2",
+    "react-router-dom": "^7.18.4",
     "socket.io-client": "^4.8.3",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.2.0",
+    "vite": "^8.3.0",
     "vite-plugin-pwa": "^1.3.0",
     "workbox-precaching": "^7.4.1",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "oxlint": "^1.75.0"
+    "oxlint": "^1.85.0"
   }
 }
