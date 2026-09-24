@@ -58,6 +58,20 @@ NODE_ENV=development
 CLIENT_URL=http://localhost:5173
 ```
 
+Optional server variables:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `TRUST_PROXY` | `1` | Express `trust proxy` setting, which decides where `req.ip` (and so every per-IP rate limit) comes from. Accepts a hop count (`0`, `1`, `2`, ...), `true`/`false`, or a comma-separated list of IPs/subnets (e.g. `loopback, 10.0.0.0/8`). `true` trusts every hop, so any client can choose its own `req.ip`, and express-rate-limit logs `ERR_ERL_PERMISSIVE_TRUST_PROXY` for it. |
+| `DEBUG_IP_ENDPOINT` | unset (off) | Set to exactly `1` to register `GET /api/debug/ip`, which returns `{ ip, ips, xff }` as Express sees them. For confirming `TRUST_PROXY` after a deploy only; unset it afterwards. |
+| `REGISTER_RATE_LIMIT_MAX` | `10` | Sign-ups allowed per IP per hour. When unset and `NODE_ENV=test`, the sign-up limiter is skipped so the test suite can register many users. |
+
+#### Checking `TRUST_PROXY` after a deploy
+1. Set `DEBUG_IP_ENDPOINT=1` on Render and redeploy.
+2. From a phone on mobile data (not your Wi-Fi), open `https://<your-app>/api/debug/ip`, and compare `ip` with the address shown by a "what is my IP" site on the same phone.
+3. If `ip` matches, the hop count is right. If not, find your real address in `xff` and count its position from the right (the last entry is 1). Set `TRUST_PROXY` to that number and repeat step 2. Never set it higher: entries to the left of your real address are whatever the client sent, so they can be faked.
+4. Remove `DEBUG_IP_ENDPOINT` and redeploy. With it unset, the route is not registered (in production the path then returns the app's `index.html`).
+
 ### 3. Run the App
 ```bash
 # Run both the client and server concurrently
@@ -78,5 +92,5 @@ This application is configured for a single-service full-stack deployment on pla
 1. Connect your GitHub repository to Render.
 2. Set the Build Command to: `npm run build`
 3. Set the Start Command to: `npm start`
-4. Provide the environment variables (`NODE_ENV=production`, `PORT=8000`, `MONGO_URI`, `JWT_SECRET`).
+4. Provide the environment variables (`NODE_ENV=production`, `PORT=8000`, `MONGO_URI`, `JWT_SECRET`), plus `TRUST_PROXY` if the check above shows the default of `1` is wrong.
 5. Deploy!

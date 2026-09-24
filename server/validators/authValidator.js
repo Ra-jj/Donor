@@ -6,8 +6,9 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters long'),
   email: z.string().email('Invalid email format').regex(/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/, 'Please enter a valid email address (e.g. name@domain.com)'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
+  // Zod 4 takes a custom message through `error`; the Zod 3 `errorMap` param is silently ignored
   bloodGroup: z.enum(BLOOD_GROUPS, {
-    errorMap: () => ({ message: 'Invalid blood group' }),
+    error: 'Invalid blood group',
   }),
   location: z
     .array(z.number())

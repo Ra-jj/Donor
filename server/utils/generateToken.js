@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('./authCookie');
 
 const generateTokenAndSetCookie = (userId, res) => {
   // Generate a JWT signed with our secret
@@ -6,12 +7,9 @@ const generateTokenAndSetCookie = (userId, res) => {
     expiresIn: '7d',
   });
 
-  // Set the token as an HTTP-only cookie
-  res.cookie('jwt', token, {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-    httpOnly: true, // Prevents XSS attacks (not accessible via JavaScript)
-    sameSite: 'strict', // Prevents CSRF attacks
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+  res.cookie(AUTH_COOKIE_NAME, token, {
+    ...getAuthCookieOptions(),
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds, same as the token's expiresIn
   });
 
   return token;

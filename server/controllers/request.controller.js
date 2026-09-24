@@ -13,6 +13,7 @@ const {
   buildDonorPins,
   angularDistanceRadians,
 } = require('../utils/locationPrivacy');
+const { describePushEndpointProblem } = require('../validators/pushValidator');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -132,8 +133,18 @@ exports.createRequest = async (req, res) => {
 
         io.to(donor._id.toString()).emit('newBloodRequest', { ...requestForDonors, matchType });
 
+        // Subscriptions stored before endpoint validation existed are re-checked before any send
+        const pushEndpointProblem =
+          donor.pushSubscription && describePushEndpointProblem(donor.pushSubscription.endpoint);
+        if (pushEndpointProblem) {
+          console.error(`Skipped web push to donor ${donor._id}: ${pushEndpointProblem}`);
+          User.findByIdAndUpdate(donor._id, { pushSubscription: null })
+            .exec()
+            .catch((clearError) => console.error('Failed to clear push subscription:', clearError.message));
+        }
+
         // Send Web Push Notification if the donor is subscribed
-        if (donor.pushSubscription) {
+        if (donor.pushSubscription && !pushEndpointProblem) {
           const payload = JSON.stringify({
             title: '🚨 Emergency Blood Request!',
             body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
