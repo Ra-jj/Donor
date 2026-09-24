@@ -2,6 +2,9 @@ const { z } = require('zod');
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const URGENCIES = ['low', 'medium', 'high'];
+// 'fulfilled' is deliberately absent: fulfilment goes only through PATCH /:id/fulfill,
+// which checks that the caller is the requester.
+const STATUS_UPDATES = ['accepted', 'declined', 'cancelled'];
 
 const createRequestSchema = z.object({
   bloodGroup: z.enum(BLOOD_GROUPS, {
@@ -36,7 +39,15 @@ const rateRequestSchema = z.object({
   ratingNote: z.string().max(500, 'Note cannot exceed 500 characters').optional().default(''),
 });
 
+const updateRequestStatusSchema = z.object({
+  // Zod 4 uses `error` for a custom message; the Zod 3 `errorMap` param is silently ignored
+  status: z.enum(STATUS_UPDATES, {
+    error: 'Status must be accepted, declined, or cancelled',
+  }),
+});
+
 module.exports = {
   createRequestSchema,
   rateRequestSchema,
+  updateRequestStatusSchema,
 };
