@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { EnvelopeSimple, Lock, SignIn, Eye, EyeSlash, Drop } from '@phosphor-icons/react';
+import { EnvelopeSimpleIcon, LockIcon, SignInIcon, EyeIcon, EyeSlashIcon, DropIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 
 const LoginPage = () => {
@@ -56,7 +56,7 @@ const LoginPage = () => {
             className="text-center mb-8"
           >
             <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <Drop weight="duotone" className="w-7 h-7" />
+              <DropIcon weight="duotone" className="w-7 h-7" />
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Welcome back</h2>
             <p className="text-base-content/50 mt-2 font-normal text-sm">Log in to your Donor account</p>
@@ -73,7 +73,7 @@ const LoginPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Email</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <EnvelopeSimple weight="regular" className="h-5 w-5 text-base-content/30" />
+                  <EnvelopeSimpleIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="email" 
@@ -110,7 +110,7 @@ const LoginPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Password</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock weight="regular" className="h-5 w-5 text-base-content/30" />
+                  <LockIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
@@ -128,7 +128,7 @@ const LoginPage = () => {
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/30 hover:text-primary transition-colors focus:outline-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
+                  {showPassword ? <EyeSlashIcon weight="regular" className="h-5 w-5" /> : <EyeIcon weight="regular" className="h-5 w-5" />}
                 </button>
               </div>
               {errors.password && (
@@ -149,10 +149,10 @@ const LoginPage = () => {
               transition={{ delay: 0.4, duration: 0.4 }}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : (
                   <>
-                    <SignIn weight="bold" className="w-5 h-5 mr-1" />
+                    <SignInIcon weight="bold" className="w-5 h-5 mr-1" />
                     Log In
                   </>
                 )}

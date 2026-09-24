@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { MapPin, User, EnvelopeSimple, Lock, Drop, Eye, EyeSlash } from '@phosphor-icons/react';
+import { MapPinIcon, UserIcon, EnvelopeSimpleIcon, LockIcon, DropIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
 
@@ -92,7 +92,7 @@ const RegisterPage = () => {
             className="text-center mb-8"
           >
             <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <Drop weight="duotone" className="w-7 h-7" />
+              <DropIcon weight="duotone" className="w-7 h-7" />
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Create Account</h2>
             <p className="text-base-content/50 mt-2 font-normal text-sm">Join Donor and start saving lives</p>
@@ -109,7 +109,7 @@ const RegisterPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Full Name</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User weight="regular" className="h-5 w-5 text-base-content/30" />
+                  <UserIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="text" 
@@ -144,7 +144,7 @@ const RegisterPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Email</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <EnvelopeSimple weight="regular" className="h-5 w-5 text-base-content/30" />
+                  <EnvelopeSimpleIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="email" 
@@ -181,7 +181,7 @@ const RegisterPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Password</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock weight="regular" className="h-5 w-5 text-base-content/30" />
+                  <LockIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
@@ -200,7 +200,7 @@ const RegisterPage = () => {
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/30 hover:text-primary transition-colors focus:outline-none"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeSlash weight="regular" className="h-5 w-5" /> : <Eye weight="regular" className="h-5 w-5" />}
+                  {showPassword ? <EyeSlashIcon weight="regular" className="h-5 w-5" /> : <EyeIcon weight="regular" className="h-5 w-5" />}
                 </button>
               </div>
               {errors.password ? (
@@ -226,7 +226,7 @@ const RegisterPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Blood Group</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Drop weight="regular" className="h-5 w-5 text-primary/50" />
+                  <DropIcon weight="regular" className="h-5 w-5 text-primary/50" />
                 </div>
                 <select 
                   className={`select w-full pl-12 rounded-xl border ${errors.bloodGroup ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all font-medium text-base`}
@@ -265,10 +265,10 @@ const RegisterPage = () => {
               <div className="flex flex-col gap-3">
                 <button 
                   type="button" 
-                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-[0.98] ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                   onClick={handleGetLocation}
                 >
-                  <MapPin weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
+                  <MapPinIcon weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
                   {formData.location ? 'Location Captured ✓' : 'Click to Get Current Location'}
                 </button>
 
@@ -283,7 +283,7 @@ const RegisterPage = () => {
                   />
                   <button 
                     type="button" 
-                    className="btn btn-secondary rounded-xl font-bold active:scale-[0.98] transition-transform"
+                    className="btn btn-secondary rounded-xl font-bold active:scale-98 transition-transform"
                     onClick={async () => {
                       const query = document.getElementById('manual-location-input').value;
                       if (!query) return toast.error('Please enter a city name');
@@ -335,7 +335,7 @@ const RegisterPage = () => {
               transition={fieldDelay(6)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Create Account'}
               </button>
             </motion.div>

@@ -63,10 +63,6 @@
   }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
-}
-
 @layer components {
   /* Restore input/select borders and backgrounds, and force remove default outline */
   .input, .select {
@@ -126,9 +122,4 @@ code {
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(1.5); }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ChatWindow from '../components/ChatWindow';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
-import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart, Star, CheckCircle } from '@phosphor-icons/react';
+import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
 const DonorMap = lazy(() => import('../components/DonorMap'));
 
@@ -28,7 +28,7 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
         onClick={() => req.status === 'accepted' && onSelect(req._id)}
         className={`card bg-base-100 shadow-md border overflow-hidden transition-colors ${
           req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'
-        } ${isSelected ? 'border-primary ring-2 ring-primary ring-opacity-50' : ''}`}
+        } ${isSelected ? 'border-primary ring-2 ring-primary/50' : ''}`}
       >
         {children}
       </motion.div>
@@ -47,10 +47,10 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
       {/* Swipe indicators behind the card */}
       <div className="absolute inset-0 rounded-2xl flex items-center justify-between px-6 pointer-events-none">
         <div className={`flex items-center gap-2 text-error font-bold transition-opacity ${dragX < -30 ? 'opacity-100' : 'opacity-0'}`}>
-          <XCircle weight="fill" className="w-6 h-6" /> Decline
+          <XCircleIcon weight="fill" className="w-6 h-6" /> Decline
         </div>
         <div className={`flex items-center gap-2 text-success font-bold transition-opacity ${canAccept && dragX > 30 ? 'opacity-100' : 'opacity-0'}`}>
-          Accept <Checks weight="fill" className="w-6 h-6" />
+          Accept <ChecksIcon weight="fill" className="w-6 h-6" />
         </div>
       </div>
 
@@ -363,7 +363,7 @@ const DashboardPage = () => {
         
         <div className="hidden lg:flex items-center gap-4 z-10 relative w-full sm:w-auto">
           <Link to="/create-request" className="btn btn-primary rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none w-full sm:w-auto active:scale-95 transition-transform">
-            <Plus weight="bold" className="w-5 h-5 mr-1" />
+            <PlusIcon weight="bold" className="w-5 h-5 mr-1" />
             Request Blood
           </Link>
         </div>
@@ -383,7 +383,7 @@ const DashboardPage = () => {
       {/* Mobile FAB */}
       <div className="lg:hidden fixed bottom-6 right-6 z-40">
         <Link to="/create-request" className="btn btn-primary btn-circle w-14 h-14 shadow-lg shadow-primary/30 glow-primary text-white flex items-center justify-center active:scale-90 transition-transform">
-          <Plus weight="bold" className="w-7 h-7" />
+          <PlusIcon weight="bold" className="w-7 h-7" />
         </Link>
       </div>
 
@@ -396,7 +396,7 @@ const DashboardPage = () => {
         >
           <div className="flex items-center gap-3">
             <div className="bg-info/20 p-2 rounded-full">
-              <BellRinging className="w-6 h-6 text-info" weight="duotone" />
+              <BellRingingIcon className="w-6 h-6 text-info" weight="duotone" />
             </div>
             <div>
               <h3 className="font-bold text-base-content text-sm sm:text-base">Enable Push Notifications</h3>
@@ -422,7 +422,7 @@ const DashboardPage = () => {
                 {incomingRequests.filter(r => r.status === 'pending').length}
               </span>
             )}
-            <BellRinging weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5" />
+            <BellRingingIcon weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5" />
             <span className="relative z-10">Incoming Matches</span>
           </button>
           <button 
@@ -432,7 +432,7 @@ const DashboardPage = () => {
             {activeTab === 'mine' && (
               <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
             )}
-            <ClockClockwise weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5" />
+            <ClockClockwiseIcon weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5" />
             <span className="relative z-10">My Requests</span>
           </button>
         </div>
@@ -460,7 +460,7 @@ const DashboardPage = () => {
                 )}
                 {incomingRequests.length === 0 ? (
                   <div className="text-center p-12 bg-base-100 rounded-2xl border border-base-300 text-base-content/60 shadow-sm">
-                    <HandHeart weight="duotone" className="w-16 h-16 mx-auto mb-4 text-primary/40" />
+                    <HandHeartIcon weight="duotone" className="w-16 h-16 mx-auto mb-4 text-primary/40" />
                     <h3 className="font-bold text-lg mb-1 text-base-content">You're all caught up!</h3>
                     <p>There are no emergency requests near you right now.</p>
                   </div>
@@ -480,7 +480,7 @@ const DashboardPage = () => {
                         {req.status === 'fulfilled' ? (
                           <div className="card-body p-5">
                             <div className="bg-success/5 border border-success/10 rounded-2xl p-5 text-center space-y-3">
-                              <CheckCircle weight="fill" className="w-12 h-12 text-success mx-auto" />
+                              <CheckCircleIcon weight="fill" className="w-12 h-12 text-success mx-auto" />
                               <h3 className="font-display font-bold text-lg text-success">Donation Complete!</h3>
                               <p className="text-sm text-base-content/70">
                                 Thank you for donating at <strong>{req.hospitalName}</strong>.
@@ -504,12 +504,12 @@ const DashboardPage = () => {
                           <>
                             {req.hospitalLocation?.coordinates && (
                               <div className="w-full relative bg-base-200 border-b border-base-200 overflow-hidden">
-                                <Suspense fallback={<div className="h-[150px] flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
+                                <Suspense fallback={<div className="h-37.5 flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
                                   <DonorMap 
                                     hospitalLocation={req.hospitalLocation.coordinates} 
                                     interactive={false}
                                     userLocation={authUser?.location?.coordinates}
-                                    height="h-[150px]"
+                                    height="h-37.5"
                                   />
                                 </Suspense>
                               </div>
@@ -580,7 +580,7 @@ const DashboardPage = () => {
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.3, layout: { duration: 0.25 } }}
                         onClick={() => req.status === 'accepted' && setSelectedRequestId(req._id)}
-                        className={`card bg-base-100 shadow-md border transition-all ${req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'} ${selectedRequestId === req._id ? 'border-primary ring-2 ring-primary ring-opacity-50' : ''}`}
+                        className={`card bg-base-100 shadow-md border transition-all ${req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'} ${selectedRequestId === req._id ? 'border-primary ring-2 ring-primary/50' : ''}`}
                       >
                         <div className="card-body p-5">
                           <div className="flex justify-between items-start">
@@ -607,7 +607,7 @@ const DashboardPage = () => {
                                 onClick={(e) => { e.stopPropagation(); handleFulfill(req._id); }}
                                 className="btn btn-sm btn-primary w-full rounded-xl font-bold shadow-sm"
                               >
-                                <CheckCircle weight="bold" className="w-4 h-4" />
+                                <CheckCircleIcon weight="bold" className="w-4 h-4" />
                                 Mark as Fulfilled
                               </button>
                             </div>
@@ -617,7 +617,7 @@ const DashboardPage = () => {
                           {req.status === 'fulfilled' && (
                             <div className="mt-3 space-y-3">
                               <div className="flex items-center gap-2 text-sm text-info font-semibold">
-                                <CheckCircle weight="fill" className="w-4 h-4" />
+                                <CheckCircleIcon weight="fill" className="w-4 h-4" />
                                 Fulfilled {req.fulfilledAt && `on ${new Date(req.fulfilledAt).toLocaleDateString()}`}
                               </div>
 
@@ -629,7 +629,7 @@ const DashboardPage = () => {
                                     <span className="text-sm font-semibold text-base-content/70">{req.rating}/5</span>
                                   </div>
                                   {req.ratingNote && (
-                                    <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-[150px]" title={req.ratingNote}>"{req.ratingNote}"</span>
+                                    <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-37.5" title={req.ratingNote}>"{req.ratingNote}"</span>
                                   )}
                                 </div>
                               ) : ratingRequestId === req._id ? (
@@ -671,7 +671,7 @@ const DashboardPage = () => {
                                   onClick={(e) => { e.stopPropagation(); setRatingRequestId(req._id); }}
                                   className="btn btn-sm btn-outline btn-warning w-full rounded-xl font-bold"
                                 >
-                                  <Star weight="bold" className="w-4 h-4" />
+                                  <StarIcon weight="bold" className="w-4 h-4" />
                                   Rate this Donor
                                 </button>
                               )}

@@ -1,7 +1,7 @@
 import { useState, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { MapPin, BuildingOffice, Drop, Heartbeat, ArrowRight } from '@phosphor-icons/react';
+import { MapPinIcon, BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
 
@@ -89,7 +89,7 @@ const CreateRequestPage = () => {
           <div className="card-body p-6 sm:p-10">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-4 border border-success/20">
-                <Heartbeat weight="fill" className="w-8 h-8" />
+                <HeartbeatIcon weight="fill" className="w-8 h-8" />
               </div>
               <h2 className="text-3xl font-display font-bold text-base-content">Request Broadcasted</h2>
               <p className="text-base-content/70 mt-2">
@@ -99,7 +99,7 @@ const CreateRequestPage = () => {
             
             <div className="w-full relative rounded-2xl overflow-hidden bg-base-200">
               <Suspense fallback={
-                <div className="h-[400px] flex flex-col items-center justify-center text-base-content/50">
+                <div className="h-100 flex flex-col items-center justify-center text-base-content/50">
                   <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
                   <p>Loading live map...</p>
                 </div>
@@ -108,7 +108,7 @@ const CreateRequestPage = () => {
                   hospitalLocation={formData.hospitalLocation}
                   donorLocations={successData.donorPins}
                   interactive={true}
-                  height="h-[400px]"
+                  height="h-100"
                 />
               </Suspense>
             </div>
@@ -116,7 +116,7 @@ const CreateRequestPage = () => {
             <div className="mt-8">
               <Link to="/dashboard" className="btn btn-primary w-full h-14 rounded-xl text-lg text-white font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform">
                 Go to Dashboard
-                <ArrowRight weight="bold" className="w-5 h-5 ml-1" />
+                <ArrowRightIcon weight="bold" className="w-5 h-5 ml-1" />
               </Link>
             </div>
           </div>
@@ -142,7 +142,7 @@ const CreateRequestPage = () => {
             className="text-center mb-8"
           >
             <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm border border-primary/10">
-              <Heartbeat weight="duotone" className="w-8 h-8" />
+              <HeartbeatIcon weight="duotone" className="w-8 h-8" />
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Request Blood</h2>
             <p className="text-base-content/50 mt-3 font-normal text-sm max-w-sm mx-auto leading-relaxed">
@@ -152,7 +152,7 @@ const CreateRequestPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
 
-            {/* Hospital Name — moved first */}
+            {/* Hospital Name */}
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -162,7 +162,7 @@ const CreateRequestPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Hospital / Blood Bank</span></label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <BuildingOffice weight="regular" className="h-5 w-5 text-base-content/30" />
+                  <BuildingOfficeIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
                   type="text" 
@@ -198,7 +198,7 @@ const CreateRequestPage = () => {
                 <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Blood Group</span></label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Drop weight="regular" className="h-5 w-5 text-primary/50" />
+                    <DropIcon weight="regular" className="h-5 w-5 text-primary/50" />
                   </div>
                   <select 
                     className={`select w-full pl-12 rounded-xl border ${errors.bloodGroup ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all font-medium text-base`}
@@ -290,10 +290,10 @@ const CreateRequestPage = () => {
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Hospital Location</span></label>
               <button 
                 type="button" 
-                className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-[0.98] ${formData.hospitalLocation ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.hospitalLocation ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                 onClick={handleGetLocation}
               >
-                <MapPin weight={formData.hospitalLocation ? "fill" : "regular"} className="w-5 h-5 mr-2" />
+                <MapPinIcon weight={formData.hospitalLocation ? "fill" : "regular"} className="w-5 h-5 mr-2" />
                 {formData.hospitalLocation ? 'Location Captured ✓' : 'Click to Get Current Location'}
               </button>
               {formData.hospitalLocation ? (
@@ -322,7 +322,7 @@ const CreateRequestPage = () => {
               transition={fieldDelay(5)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-[0.98] transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency Request'}
               </button>
             </motion.div>

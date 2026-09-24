@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Star } from '@phosphor-icons/react';
+import { useState } from 'react';
+import { StarIcon } from '@phosphor-icons/react';
 
 const StarRating = ({ rating, onRate, interactive = false, size = 'w-6 h-6', className = '' }) => {
   const [hover, setHover] = useState(0);
@@ -18,7 +18,7 @@ const StarRating = ({ rating, onRate, interactive = false, size = 'w-6 h-6', cla
           disabled={!interactive}
           aria-label={interactive ? `Rate ${star} stars` : `${rating} out of 5 stars`}
         >
-          <Star weight={(hover || rating) >= star ? "fill" : "regular"} className={size} />
+          <StarIcon weight={(hover || rating) >= star ? "fill" : "regular"} className={size} />
         </button>
       ))}
     </div>

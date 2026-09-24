@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -62,7 +62,7 @@ const DonorMap = ({
   searchRadiusKm = 15, 
   interactive = true, 
   userLocation = null,
-  height = "h-[400px]" 
+  height = "h-100" 
 }) => {
   if (!hospitalLocation || hospitalLocation.length !== 2) return null;
 

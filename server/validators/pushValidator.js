@@ -89,6 +89,5 @@ const pushSubscriptionSchema = z.object(
 
 module.exports = {
   pushSubscriptionSchema,
-  PUSH_SERVICE_HOST_ALLOWLIST,
   describePushEndpointProblem,
 };
