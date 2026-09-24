@@ -36,11 +36,18 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+// Only when run directly (npm start / dev). Tests require this file, so require.main is not
+// this module there and they start their own server on an in-memory database.
 if (require.main === module) {
-  server.listen(PORT, async () => {
+  // Connect first: a request or socket handshake accepted before MongoDB is ready would wait
+  // on Mongoose's command buffer and could fail. connectDB exits the process if it cannot connect.
+  const startServer = async () => {
     await connectDB();
-    console.log(`Server running on port ${PORT}`);
-  });
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  };
+  startServer();
 }
 
 module.exports = app;

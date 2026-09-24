@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { getSocket } from '../lib/socket';
+import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
 import { PaperPlaneRight, ChatCircleDots } from '@phosphor-icons/react';
@@ -50,10 +50,17 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       }
     };
 
-    // Messages sent while offline are not replayed, so refetch quietly on reconnect. Keep
-    // local messages the server list lacks (an unsent optimistic one has a temporary _id).
+    // Messages sent while offline are not replayed, so refetch quietly on every connect after
+    // this socket's first ('connect' also follows the manual retries in lib/socket.js, which
+    // fire no 'reconnect'). Keep local messages the server list lacks (an unsent optimistic
+    // one has a temporary _id). The draft in the input is separate state and is not touched.
     let isCurrent = true;
-    const handleReconnect = () => {
+    let hasConnectedBefore = hasSocketConnectedBefore(socket);
+    // A first connect that followed failed attempts also refetches (see DashboardPage)
+    const handleConnect = () => {
+      const shouldRefetch = hasConnectedBefore || hadFailedAttempt(socket);
+      hasConnectedBefore = true;
+      if (!shouldRefetch) return;
       axiosInstance
         .get(`/messages/${requestId}`)
         .then((response) => {
@@ -68,12 +75,12 @@ const ChatWindow = ({ requestId, currentUserId }) => {
     };
 
     socket.on('newMessage', handleNewMessage);
-    socket.io.on('reconnect', handleReconnect);
+    socket.on('connect', handleConnect);
 
     return () => {
       isCurrent = false;
       socket.off('newMessage', handleNewMessage);
-      socket.io.off('reconnect', handleReconnect);
+      socket.off('connect', handleConnect);
     };
   }, [requestId]);
 
