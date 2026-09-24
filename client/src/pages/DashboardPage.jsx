@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
@@ -13,7 +13,7 @@ import { Plus, BellRinging, ClockClockwise, Checks, XCircle, HandHeart, Star, Ch
 const DonorMap = lazy(() => import('../components/DonorMap'));
 
 /** Swipeable request card for mobile — drag right to accept, left to decline */
-const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, children }) => {
+const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, canAccept, children }) => {
   const [dragX, setDragX] = useState(0);
 
   if (req.status !== 'pending') {
@@ -49,7 +49,7 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
         <div className={`flex items-center gap-2 text-error font-bold transition-opacity ${dragX < -30 ? 'opacity-100' : 'opacity-0'}`}>
           <XCircle weight="fill" className="w-6 h-6" /> Decline
         </div>
-        <div className={`flex items-center gap-2 text-success font-bold transition-opacity ${dragX > 30 ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`flex items-center gap-2 text-success font-bold transition-opacity ${canAccept && dragX > 30 ? 'opacity-100' : 'opacity-0'}`}>
           Accept <Checks weight="fill" className="w-6 h-6" />
         </div>
       </div>
@@ -57,11 +57,13 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
       <motion.div
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.3}
+        // A busy donor can still swipe left to decline, but the card will not move right
+        dragElastic={canAccept ? 0.3 : { left: 0.3, right: 0 }}
         onDrag={(_, info) => setDragX(info.offset.x)}
         onDragEnd={(_, info) => {
           setDragX(0);
-          if (info.offset.x > 100) {
+          // info.offset is the pointer's movement, not the card's, so check canAccept here too
+          if (canAccept && info.offset.x > 100) {
             onAccept(req._id);
           } else if (info.offset.x < -100) {
             onDecline(req._id);
@@ -69,7 +71,7 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
         }}
         style={{ 
           x: 0,
-          backgroundColor: dragX > 30 ? 'rgba(22, 163, 74, 0.05)' : dragX < -30 ? 'rgba(220, 38, 38, 0.05)' : 'transparent'
+          backgroundColor: canAccept && dragX > 30 ? 'rgba(22, 163, 74, 0.05)' : dragX < -30 ? 'rgba(220, 38, 38, 0.05)' : 'transparent'
         }}
         className="card bg-base-100 shadow-md border border-base-200 overflow-hidden cursor-grab active:cursor-grabbing rounded-2xl touch-pan-y"
       >
@@ -89,6 +91,8 @@ const DashboardPage = () => {
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [pushEnabled, setPushEnabled] = useState(!!authUser?.pushSubscription);
   const [stats, setStats] = useState(null);
+  // Busy donor: already holds an accepted request, so Accept is disabled until it ends
+  const [hasActiveDonation, setHasActiveDonation] = useState(false);
 
   // Rating state — tracks which request is being rated
   const [ratingRequestId, setRatingRequestId] = useState(null);
@@ -131,9 +135,11 @@ const DashboardPage = () => {
     }
   };
 
-  const fetchDashboardData = async () => {
+  // silent: refresh in place, without the full-page spinner that would remount ChatWindow
+  // (losing the draft, focus and scroll)
+  const fetchDashboardData = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [mineRes, incomingRes, statsRes] = await Promise.all([
         axiosInstance.get('/requests/mine'),
         axiosInstance.get('/requests/incoming'),
@@ -141,12 +147,24 @@ const DashboardPage = () => {
       ]);
       setMyRequests(mineRes.data.requests);
       setIncomingRequests(incomingRes.data.incomingRequests);
+      setHasActiveDonation(Boolean(incomingRes.data.hasActiveDonation));
       setStats(statsRes.data);
+
+      // After a quiet refresh, a selected request that is no longer accepted has no chat,
+      // so return to the list instead of the placeholder. A request is in only one list.
+      if (silent) {
+        const refreshed = [...mineRes.data.requests, ...incomingRes.data.incomingRequests];
+        setSelectedRequestId((cur) => {
+          if (!cur) return cur;
+          const selected = refreshed.find((req) => req._id === cur);
+          return selected && selected.status === 'accepted' ? cur : null;
+        });
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -178,12 +196,26 @@ const DashboardPage = () => {
     };
   }, []);
 
+  // The status handler below is registered once, so it reads the latest list through this ref
+  const myRequestsRef = useRef(myRequests);
+  useEffect(() => {
+    myRequestsRef.current = myRequests;
+  }, [myRequests]);
+
   // Listen for real-time status updates on MY requests (e.g. someone accepted it)
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
     const handleStatusUpdate = (data) => {
+      // A late 'accepted' for a request that has already ended here must not revive it
+      if (data.status === 'accepted') {
+        const localRequest = myRequestsRef.current.find((req) => req._id === data.requestId);
+        if (localRequest && ['cancelled', 'fulfilled'].includes(localRequest.status)) {
+          return;
+        }
+      }
+
       if (data.status === 'accepted') {
         toast.success(`${data.donorName} accepted your request!`, { icon: '✅', duration: 5000 });
       } else if (data.status === 'fulfilled') {
@@ -199,14 +231,23 @@ const DashboardPage = () => {
         req._id === data.requestId ? { ...req, status: data.status, matchedDonorId: 'temp_id' } : req
       ));
 
-      // Update incoming requests for the donor side
-      setIncomingRequests((prev) => prev.map(req => 
-        req._id === data.requestId ? { ...req, status: data.status === 'rated' ? 'fulfilled' : data.status, rating: data.rating || req.rating, ratingNote: data.ratingNote || req.ratingNote } : req
-      ));
+      // Update incoming requests for the donor side. A cancelled request is gone for the
+      // donor, so drop its card rather than keep it with a cancelled badge.
+      setIncomingRequests((prev) => (data.status === 'cancelled'
+        ? prev.filter((req) => req._id !== data.requestId)
+        : prev.map(req =>
+          req._id === data.requestId ? { ...req, status: data.status === 'rated' ? 'fulfilled' : data.status, rating: data.rating || req.rating, ratingNote: data.ratingNote || req.ratingNote } : req
+        )));
 
-      // A cancelled or fulfilled request has no chat, so close it if it is open.
-      // Functional updater because this effect only runs once and cannot read selectedRequestId.
+      // Cancel and fulfil events only reach the matched donor, and a donor holds at most one
+      // accepted request, so either one means this donor is no longer busy
       if (data.status === 'cancelled' || data.status === 'fulfilled') {
+        setHasActiveDonation(false);
+      }
+
+      // A cancelled, fulfilled or rated request has no chat, so close it if it is open.
+      // Functional updater because this effect only runs once and cannot read selectedRequestId.
+      if (['cancelled', 'fulfilled', 'rated'].includes(data.status)) {
         setSelectedRequestId((cur) => (cur === data.requestId ? null : cur));
       }
 
@@ -214,10 +255,15 @@ const DashboardPage = () => {
       axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
     };
 
+    // Events sent while this client was offline are not replayed, so refetch on reconnect
+    const handleReconnect = () => fetchDashboardData({ silent: true });
+
     socket.on('requestStatusUpdate', handleStatusUpdate);
+    socket.io.on('reconnect', handleReconnect);
 
     return () => {
       socket.off('requestStatusUpdate', handleStatusUpdate);
+      socket.io.off('reconnect', handleReconnect);
     };
   }, []);
 
@@ -397,6 +443,11 @@ const DashboardPage = () => {
                 className="space-y-4"
               >
                 <h2 className="text-xl font-bold mb-4">Requests Needing Your Help</h2>
+                {hasActiveDonation && (
+                  <div role="status" className="bg-warning/10 border border-warning/20 rounded-2xl p-4 text-sm font-medium text-base-content">
+                    You have an active donation. Complete it before accepting another.
+                  </div>
+                )}
                 {incomingRequests.length === 0 ? (
                   <div className="text-center p-12 bg-base-100 rounded-2xl border border-base-300 text-base-content/60 shadow-sm">
                     <HandHeart weight="duotone" className="w-16 h-16 mx-auto mb-4 text-primary/40" />
@@ -413,6 +464,7 @@ const DashboardPage = () => {
                         onDecline={(id) => handleUpdateStatus(id, 'declined')}
                         onSelect={setSelectedRequestId}
                         isSelected={selectedRequestId === req._id}
+                        canAccept={!hasActiveDonation}
                       >
                         {/* Fulfilled Thank You state for donor */}
                         {req.status === 'fulfilled' ? (
@@ -475,7 +527,7 @@ const DashboardPage = () => {
                                       Swipe or tap →
                                     </span>
                                     <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-error">Decline</button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }} className="btn btn-sm btn-success text-white">Accept & Help</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }} disabled={hasActiveDonation} className="btn btn-sm btn-success text-white">Accept & Help</button>
                                   </>
                                 ) : req.status === 'accepted' ? (
                                   <div className="badge badge-success text-white p-3 font-semibold">Accepted by you</div>

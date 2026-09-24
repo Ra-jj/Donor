@@ -70,7 +70,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(userId, updates, {
-      new: true,
+      returnDocument: 'after',
       select: '-password',
     });
 

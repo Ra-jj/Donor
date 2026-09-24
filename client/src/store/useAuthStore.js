@@ -62,15 +62,4 @@ export const useAuthStore = create((set) => ({
       toast.error(error.response?.data?.message || 'Logout failed');
     }
   },
-
-  updateAvailability: async (isAvailable) => {
-    // We don't have a specific update profile endpoint in our minimal backend,
-    // but typically we'd hit one here. For now, we will assume this might be handled 
-    // in a future step, or we can just update local state if needed.
-    // If the backend had /auth/profile/update, we would call it.
-    // To stay strictly within the MVP spec, we won't mock a non-existent API.
-    set((state) => ({
-      authUser: { ...state.authUser, isAvailable }
-    }));
-  }
 }));
