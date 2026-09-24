@@ -28,7 +28,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  if (server) await new Promise((resolve) => server.close(resolve));
   await closeDB();
   if (previousRegisterLimit === undefined) {
     delete process.env.REGISTER_RATE_LIMIT_MAX;

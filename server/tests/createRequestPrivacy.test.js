@@ -198,7 +198,7 @@ describe('POST /api/requests donor privacy', () => {
   });
 
   afterAll(async () => {
-    await new Promise((resolve) => server.close(resolve));
+    if (server) await new Promise((resolve) => server.close(resolve));
     await closeDB();
   });
 

@@ -136,15 +136,14 @@ const DashboardPage = () => {
   };
 
   // silent: refresh in place, without the full-page spinner that would remount ChatWindow
-  // (losing the draft, focus and scroll)
-  const fetchDashboardData = async ({ silent = false } = {}) => {
-    try {
-      if (!silent) setLoading(true);
-      const [mineRes, incomingRes, statsRes] = await Promise.all([
-        axiosInstance.get('/requests/mine'),
-        axiosInstance.get('/requests/incoming'),
-        axiosInstance.get('/users/stats'),
-      ]);
+  // (losing the draft, focus and scroll). State is only set in the promise callbacks, once the
+  // requests settle, so the mount effect below never sets state synchronously.
+  const fetchDashboardData = ({ silent = false } = {}) => Promise.all([
+    axiosInstance.get('/requests/mine'),
+    axiosInstance.get('/requests/incoming'),
+    axiosInstance.get('/users/stats'),
+  ])
+    .then(([mineRes, incomingRes, statsRes]) => {
       setMyRequests(mineRes.data.requests);
       setIncomingRequests(incomingRes.data.incomingRequests);
       setHasActiveDonation(Boolean(incomingRes.data.hasActiveDonation));
@@ -160,12 +159,20 @@ const DashboardPage = () => {
           return selected && selected.status === 'accepted' ? cur : null;
         });
       }
-    } catch (error) {
+    })
+    .catch((error) => {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard');
-    } finally {
+    })
+    .finally(() => {
       if (!silent) setLoading(false);
-    }
+    });
+
+  // Refetch behind the full-page spinner, for the action handlers. The first load does not
+  // go through here: loading already starts true, so it has no spinner to turn on.
+  const reloadDashboardData = () => {
+    setLoading(true);
+    return fetchDashboardData();
   };
 
   useEffect(() => {
@@ -281,13 +288,13 @@ const DashboardPage = () => {
     try {
       await axiosInstance.patch(`/requests/${requestId}/status`, { status: newStatus });
       toast.success(`Request ${newStatus}`);
-      fetchDashboardData(); // Refresh to get updated state
+      reloadDashboardData(); // Refresh to get updated state
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Failed to update request status');
       // 403/404/409 mean the card no longer matches the server, so refresh to drop it
       if (err.response && [403, 404, 409].includes(err.response.status)) {
-        fetchDashboardData();
+        reloadDashboardData();
       }
     }
   };
@@ -296,7 +303,7 @@ const DashboardPage = () => {
     try {
       await axiosInstance.patch(`/requests/${requestId}/fulfill`);
       toast.success('Request marked as fulfilled! 🎉');
-      fetchDashboardData();
+      reloadDashboardData();
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Failed to mark as fulfilled');
@@ -318,7 +325,7 @@ const DashboardPage = () => {
       setRatingRequestId(null);
       setRatingValue(0);
       setRatingNote('');
-      fetchDashboardData();
+      reloadDashboardData();
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Failed to submit rating');

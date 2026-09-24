@@ -9,8 +9,12 @@ const Navbar = () => {
   const { authUser, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  // The mobile menu remembers the location it was opened on and counts as open only while
+  // that location is current, so a route change closes it without an effect. useLocation
+  // returns a new object on every navigation, so this is the same check as a [location] dep.
+  const [mobileMenuLocation, setMobileMenuLocation] = useState(null);
+  const mobileMenuOpen = mobileMenuLocation === location;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,11 +23,6 @@ const Navbar = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location]);
 
   return (
     <>
@@ -124,7 +123,7 @@ const Navbar = () => {
           {/* Mobile Hamburger */}
           <button 
             className="md:hidden btn btn-ghost btn-circle active:scale-95 transition-transform min-h-11 min-w-11"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => setMobileMenuLocation(location)}
           >
             <ListIcon weight="regular" className="w-7 h-7" />
           </button>
@@ -140,7 +139,7 @@ const Navbar = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-base-content/20 backdrop-blur-sm z-50 md:hidden"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => setMobileMenuLocation(null)}
             />
             <motion.div
               initial={{ x: '100%' }}
@@ -154,7 +153,7 @@ const Navbar = () => {
                   <DropIcon weight="duotone" className="w-7 h-7 text-primary" />
                   <span className="text-xl font-display font-extrabold text-base-content">Donor</span>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="btn btn-ghost btn-circle btn-sm active:scale-95 transition-transform min-h-11 min-w-11">
+                <button onClick={() => setMobileMenuLocation(null)} className="btn btn-ghost btn-circle btn-sm active:scale-95 transition-transform min-h-11 min-w-11">
                   <XIcon weight="regular" className="w-6 h-6" />
                 </button>
               </div>
