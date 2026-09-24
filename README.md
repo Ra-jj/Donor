@@ -103,5 +103,10 @@ This application is configured for a single-service full-stack deployment on pla
 1. Connect your GitHub repository to Render.
 2. Set the Build Command to: `npm run build`
 3. Set the Start Command to: `npm start`
-4. Provide the environment variables (`NODE_ENV=production`, `PORT=8000`, `MONGO_URI`, `JWT_SECRET`), plus `TRUST_PROXY` if the check above shows the default of `1` is wrong.
+4. Provide the environment variables:
+   - `NODE_ENV=production`, `PORT=8000`, `MONGO_URI`, `JWT_SECRET`. The server refuses to start without `MONGO_URI` and `JWT_SECRET`.
+   - For push notifications: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, plus the same public key as `VITE_VAPID_PUBLIC_KEY`, which must be set when `npm run build` runs (Vite builds it into the client). Without the keys, notifications are sent unsigned and rejected by the push service (an error is logged per donor), so they never arrive.
+   - `TRUST_PROXY` if the check above shows the default of `1` is wrong.
+   - `CLIENT_URL` is not needed: the server serves the client from its own origin, so the browser never makes a cross-origin (CORS) request.
 5. Deploy!
+6. After the CI workflow (`.github/workflows/ci.yml`) has run once on `main`, set the Render service's **Settings → Auto-Deploy** to **After CI Checks Pass**, so a commit that fails the tests or the build is never deployed.

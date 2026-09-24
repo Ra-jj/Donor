@@ -1,0 +1,25 @@
+# Opens pull requests for dependency updates, so security fixes arrive without anyone checking by hand.
+# Minor and patch updates come as one grouped PR per folder; major updates come one PR each,
+# since they can break things. CI runs on every one of these PRs before anything is merged.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: monthly
+    groups:
+      server-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /client
+    schedule:
+      interval: monthly
+    groups:
+      client-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

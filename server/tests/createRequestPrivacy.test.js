@@ -186,8 +186,8 @@ describe('POST /api/requests donor privacy', () => {
   });
 
   beforeEach(() => {
-    // index.js loads server/.env, so VAPID keys may be configured here. Without this mock,
-    // a well-formed subscription would be sent to the real push service over the network,
+    // Without this mock, a well-formed subscription would be sent to the real push service over
+    // the network (web-push sends even with no VAPID keys, which tests/setupEnv.js leaves unset),
     // and the malformed test keys below make the real call reject and log an error.
     sendNotificationSpy = jest.spyOn(webpush, 'sendNotification').mockResolvedValue({ statusCode: 201 });
   });
