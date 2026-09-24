@@ -103,18 +103,18 @@ const DonorMap = ({
           </Marker>
         )}
 
-        {/* Matched Donor Pins */}
-        {donorLocations.map((donor) => {
-          if (!donor.location || !donor.location.coordinates || donor.location.coordinates.length !== 2) return null;
-          const lat = donor.location.coordinates[1];
-          const lng = donor.location.coordinates[0];
+        {/* Matched Donor Pins: the server sends only rounded (~1.1 km), deduplicated
+            [lng, lat] pins with no donor identity, so the array index is the only key */}
+        {donorLocations.map((pin, index) => {
+          if (!pin || !Array.isArray(pin.coordinates) || pin.coordinates.length !== 2) return null;
+          const lat = pin.coordinates[1];
+          const lng = pin.coordinates[0];
           return (
-            <Marker key={donor._id} position={[lat, lng]} icon={donorIcon}>
+            <Marker key={index} position={[lat, lng]} icon={donorIcon}>
               {interactive && (
                 <Popup>
-                  <div className="font-bold text-primary mb-1">Compatible Donor</div>
+                  <div className="font-bold text-primary mb-1">Compatible donor nearby (approximate location)</div>
                   <div className="flex items-center gap-2">
-                    <span className="badge badge-error badge-sm text-white font-bold">{donor.bloodGroup}</span>
                     <span className="text-xs font-semibold text-success flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
                       Available

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { io } = require('../lib/socket');
@@ -7,6 +8,12 @@ const {
   getCompatibleDonorGroups,
   getCompatibleRecipientGroups,
 } = require('../utils/bloodCompatibility');
+const {
+  PIN_CANDIDATE_MARGIN_KM,
+  roundCoordinatePair,
+  buildDonorPins,
+  angularDistanceRadians,
+} = require('../utils/locationPrivacy');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -49,56 +56,89 @@ exports.createRequest = async (req, res) => {
     // IMPORTANT: $centerSphere takes radius in radians.
     // To convert km to radians, divide distance by Earth's radius (6378.1 km).
     const radiusInRadians = RADIUS_KM / EARTH_RADIUS_KM;
-    
+    // Wider, so the same query also returns every donor whose ROUNDED point is within RADIUS_KM
+    const candidateRadiusInRadians = (RADIUS_KM + PIN_CANDIDATE_MARGIN_KM) / EARTH_RADIUS_KM;
+
     // Find all donors whose blood group is compatible with the requested blood group
     const compatibleDonorGroups = getCompatibleDonorGroups(bloodGroup);
 
-    const matchedDonors = await User.find({
+    // One query over the wider radius; both donor lists below are filtered from it in JS.
+    // Select only what this handler uses: _id for the socket room, bloodGroup for exact vs
+    // compatible, pushSubscription for the push, and location for the two distance checks.
+    const candidateDonors = await User.find({
       _id: { $ne: requesterId }, // Exclude the requester themselves
-      bloodGroup: { $in: compatibleDonorGroups }, 
+      bloodGroup: { $in: compatibleDonorGroups },
       isAvailable: true,
       location: {
         $geoWithin: {
-          $centerSphere: [hospitalLocation, radiusInRadians], // [ [lng, lat], radiusInRadians ]
+          $centerSphere: [hospitalLocation, candidateRadiusInRadians], // [ [lng, lat], radiusInRadians ]
         },
       },
-    }).select('_id name email location bloodGroup pushSubscription');
+    }).select('_id bloodGroup pushSubscription location');
 
-    // 3. Emit real-time socket events and web push notifications to matched donors
-    matchedDonors.forEach((donor) => {
-      const isExactMatch = donor.bloodGroup === bloodGroup;
-      const matchType = isExactMatch ? 'exact' : 'compatible';
+    // Donors to notify: EXACT home within RADIUS_KM, the rule the $centerSphere query applied
+    // before (same spherical model, same radius in radians)
+    const donorsToNotify = candidateDonors.filter(
+      (donor) => angularDistanceRadians(hospitalLocation, donor.location.coordinates) <= radiusInRadians
+    );
 
-      io.to(donor._id.toString()).emit('newBloodRequest', {
-        ...newRequest.toObject(),
-        requesterName: req.user.name,
-        matchType,
-      });
-
-      // Send Web Push Notification if the donor is subscribed
-      if (donor.pushSubscription) {
-        const payload = JSON.stringify({
-          title: '🚨 Emergency Blood Request!',
-          body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
-          icon: '/pwa-192x192.png',
-          data: { url: '/dashboard' }
-        });
-        
-        webpush.sendNotification(donor.pushSubscription, payload).catch((err) => {
-          console.error(`Failed to send web push to donor ${donor._id}:`, err.message);
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            // Subscription expired or invalid, remove it
-            User.findByIdAndUpdate(donor._id, { pushSubscription: null }).exec();
-          }
-        });
-      }
-    });
+    // What the requester sees depends ONLY on rounded homes. If the count used exact homes,
+    // a requester could move the hospital point until a donor drops out of the count and so
+    // binary-search the 15 km edge down to that donor's exact home.
+    // Accepted inaccuracy: near the edge, the count and pins can differ slightly from who was
+    // notified (a donor just outside may be counted, one just inside may not). The UI only
+    // says "compatible donors near", so that is fine.
+    const visibleDonorPoints = candidateDonors
+      .map((donor) => roundCoordinatePair(donor.location.coordinates))
+      .filter((point) => point && angularDistanceRadians(hospitalLocation, point) <= radiusInRadians);
 
     res.status(201).json({
       message: 'Request created and donors matched successfully',
       request: newRequest,
-      matchedDonors: matchedDonors.map((donor) => donor._id),
-      matchedDonorDetails: matchedDonors, // Optional: helpful for testing/debugging
+      // Any logged-in user can create a request anywhere, so only a count and ~1.1 km pins
+      // go back: no donor ids, names, emails, blood groups, push data or exact coordinates.
+      matchedDonorCount: visibleDonorPoints.length,
+      donorPins: buildDonorPins(visibleDonorPoints),
+    });
+
+    // 3. Emit real-time socket events and web push notifications to matched donors.
+    // Runs AFTER the response: sendNotification does synchronous encryption work per donor
+    // inside the exact radius, which would otherwise be a timing signal on exact homes.
+    // A try/catch per donor: the 201 has already been sent (the outer catch would try a 500),
+    // and one failing donor must not stop the rest from being notified.
+    donorsToNotify.forEach((donor) => {
+      try {
+        const isExactMatch = donor.bloodGroup === bloodGroup;
+        const matchType = isExactMatch ? 'exact' : 'compatible';
+
+        io.to(donor._id.toString()).emit('newBloodRequest', {
+          ...newRequest.toObject(),
+          requesterName: req.user.name,
+          matchType,
+        });
+
+        // Send Web Push Notification if the donor is subscribed
+        if (donor.pushSubscription) {
+          const payload = JSON.stringify({
+            title: '🚨 Emergency Blood Request!',
+            body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
+            icon: '/pwa-192x192.png',
+            data: { url: '/dashboard' }
+          });
+        
+          webpush.sendNotification(donor.pushSubscription, payload).catch((err) => {
+            console.error(`Failed to send web push to donor ${donor._id}:`, err.message);
+            if (err.statusCode === 410 || err.statusCode === 404) {
+              // Subscription expired or invalid, remove it
+              User.findByIdAndUpdate(donor._id, { pushSubscription: null })
+                .exec()
+                .catch((clearError) => console.error('Failed to clear push subscription:', clearError.message));
+            }
+          });
+        }
+      } catch (notifyError) {
+        console.error(`Error notifying donor ${donor._id}:`, notifyError.message);
+      }
     });
   } catch (error) {
     console.error('Error in createRequest:', error.message);
@@ -174,24 +214,37 @@ const acceptRequest = async (req, res) => {
   const donor = req.user;
   const requestId = req.params.id;
 
-  // Every eligibility rule lives in the filter of ONE atomic write. If two donors
-  // accept at the same moment, only the first can still match status: 'pending'.
+  // The request write and the donor write commit together or not at all. Every eligibility
+  // rule lives in the filter of the request write, so if two donors accept at the same
+  // moment only the first can still match status: 'pending'; the other hits a write
+  // conflict, the driver retries it, and it then matches nothing.
   let request;
   try {
-    request = await Request.findOneAndUpdate(
-      {
-        _id: requestId,
-        status: 'pending',
-        requesterId: { $ne: donor._id },
-        bloodGroup: { $in: getCompatibleRecipientGroups(donor.bloodGroup) },
-        hospitalLocation: withinDonorRadius(donor),
-      },
-      { $set: { status: 'accepted', matchedDonorId: donor._id } },
-      { returnDocument: 'after' }
-    );
+    request = await mongoose.connection.transaction(async (session) => {
+      const acceptedRequest = await Request.findOneAndUpdate(
+        {
+          _id: requestId,
+          status: 'pending',
+          requesterId: { $ne: donor._id },
+          bloodGroup: { $in: getCompatibleRecipientGroups(donor.bloodGroup) },
+          hospitalLocation: withinDonorRadius(donor),
+        },
+        { $set: { status: 'accepted', matchedDonorId: donor._id } },
+        { returnDocument: 'after', session }
+      );
+      // Nothing matched: no donor write, and the empty transaction just commits
+      if (!acceptedRequest) {
+        return null;
+      }
+
+      // Take the donor out of the matching pool until the request is fulfilled or cancelled
+      await User.findByIdAndUpdate(donor._id, { isAvailable: false }, { session });
+      return acceptedRequest;
+    });
   } catch (error) {
     // The one_active_donation_per_donor unique index (request.model.js) rejected the write:
-    // this donor already has an accepted request, even if both accepts were sent at once
+    // this donor already has an accepted request, even if both accepts were sent at once.
+    // E11000 has no TransientTransactionError label, so the driver does not retry it.
     if (error.code === 11000) {
       return res.status(409).json({
         message: 'You already have an active donation. Complete or wait for it to be cancelled before accepting another.',
@@ -234,17 +287,14 @@ const acceptRequest = async (req, res) => {
     return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
   }
 
-  // Take the donor out of the matching pool until the request is fulfilled or cancelled
-  await User.findByIdAndUpdate(donor._id, { isAvailable: false });
-
-  // The requester can cancel (or fulfil) between the accept write and the write above. That
-  // restores the donor BEFORE we mark them unavailable, leaving them stuck out of the pool,
-  // and the requester would get a stale 'accepted' event. Re-check the match and undo.
+  // Events go out only after the commit: the driver may re-run the transaction callback.
+  // A cancel or fulfil can still commit between our commit and this emit, so re-read to
+  // avoid sending the requester a stale 'accepted'. No availability undo is needed here:
+  // those transactions restore the donor in the same commit that changes the request.
   const current = await Request.findById(request._id).select('status matchedDonorId');
   const isStillMatched =
     current && current.status === 'accepted' && String(current.matchedDonorId) === String(donor._id);
   if (!isStillMatched) {
-    await User.findByIdAndUpdate(donor._id, { isAvailable: true });
     return res.status(409).json({
       message: `This request has already been ${current ? current.status : 'removed'}`,
     });
@@ -292,16 +342,25 @@ const cancelRequest = async (req, res) => {
   const requester = req.user;
   const requestId = req.params.id;
 
-  // Only the requester can cancel, and only while the request is still open
-  const request = await Request.findOneAndUpdate(
-    {
-      _id: requestId,
-      requesterId: requester._id,
-      status: { $in: ['pending', 'accepted'] },
-    },
-    { $set: { status: 'cancelled' } },
-    { returnDocument: 'after' }
-  );
+  // Only the requester can cancel, and only while the request is still open.
+  // The request write and the donor write commit together or not at all.
+  const request = await mongoose.connection.transaction(async (session) => {
+    const cancelledRequest = await Request.findOneAndUpdate(
+      {
+        _id: requestId,
+        requesterId: requester._id,
+        status: { $in: ['pending', 'accepted'] },
+      },
+      { $set: { status: 'cancelled' } },
+      { returnDocument: 'after', session }
+    );
+
+    // Accepting marked the donor unavailable, so give them back to the matching pool
+    if (cancelledRequest && cancelledRequest.matchedDonorId) {
+      await User.findByIdAndUpdate(cancelledRequest.matchedDonorId, { isAvailable: true }, { session });
+    }
+    return cancelledRequest;
+  });
 
   if (!request) {
     const existing = await Request.findById(requestId);
@@ -314,10 +373,8 @@ const cancelRequest = async (req, res) => {
     return res.status(409).json({ message: `This request has already been ${existing.status}` });
   }
 
-  // Accepting marked the donor unavailable, so give them back to the matching pool
+  // Notify the donor only after the commit: the driver may re-run the transaction callback
   if (request.matchedDonorId) {
-    await User.findByIdAndUpdate(request.matchedDonorId, { isAvailable: true });
-
     io.to(request.matchedDonorId.toString()).emit('requestStatusUpdate', {
       requestId: request._id,
       status: 'cancelled',
@@ -351,12 +408,21 @@ exports.updateRequestStatus = async (req, res) => {
 
 exports.fulfillRequest = async (req, res) => {
   try {
-    // One atomic write, so a fulfil cannot overwrite a cancel that landed a moment earlier
-    const request = await Request.findOneAndUpdate(
-      { _id: req.params.id, requesterId: req.user._id, status: 'accepted' },
-      { $set: { status: 'fulfilled', fulfilledAt: new Date() } },
-      { returnDocument: 'after' }
-    );
+    // The status filter is part of the write, so a fulfil cannot overwrite a cancel that
+    // landed a moment earlier. The request write and the donor write commit together.
+    const request = await mongoose.connection.transaction(async (session) => {
+      const fulfilledRequest = await Request.findOneAndUpdate(
+        { _id: req.params.id, requesterId: req.user._id, status: 'accepted' },
+        { $set: { status: 'fulfilled', fulfilledAt: new Date() } },
+        { returnDocument: 'after', session }
+      );
+
+      // Restore donor availability so they can accept future requests
+      if (fulfilledRequest && fulfilledRequest.matchedDonorId) {
+        await User.findByIdAndUpdate(fulfilledRequest.matchedDonorId, { isAvailable: true }, { session });
+      }
+      return fulfilledRequest;
+    });
 
     if (!request) {
       // The write matched nothing: read the request to report which rule failed
@@ -373,12 +439,10 @@ exports.fulfillRequest = async (req, res) => {
       return res.status(400).json({ message: 'Only accepted requests can be marked as fulfilled' });
     }
 
-    // Restore donor availability so they can accept future requests
+    // Notify the donor only after the commit (the driver may re-run the transaction callback).
+    // Inside the guard: the write has already committed, so a null matchedDonorId must not
+    // turn a successful fulfil into a 500.
     if (request.matchedDonorId) {
-      await User.findByIdAndUpdate(request.matchedDonorId, { isAvailable: true });
-
-      // Notify the donor in real-time (inside the guard: the write has already committed,
-      // so a null matchedDonorId must not turn a successful fulfil into a 500)
       io.to(request.matchedDonorId.toString()).emit('requestStatusUpdate', {
         requestId: request._id,
         status: 'fulfilled',
