@@ -10,8 +10,10 @@ export const useAuthStore = create((set) => ({
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get('/auth/check');
-      set({ authUser: res.data.user });
+      // Socket first, so components rendered for this user subscribe to this user's socket.
+      // initSocket reuses a live socket only if it was opened for this same user.
       initSocket(res.data.user._id);
+      set({ authUser: res.data.user });
     } catch (error) {
       console.error('Error in checkAuth:', error);
       set({ authUser: null });
@@ -23,8 +25,10 @@ export const useAuthStore = create((set) => ({
   register: async (data) => {
     try {
       const res = await axiosInstance.post('/auth/register', data);
-      set({ authUser: res.data.user });
+      // The server just set a new jwt cookie, so always open a new socket authenticated by it
+      disconnectSocket();
       initSocket(res.data.user._id);
+      set({ authUser: res.data.user });
       toast.success('Account created successfully');
       return { success: true };
     } catch (error) {
@@ -39,8 +43,10 @@ export const useAuthStore = create((set) => ({
   login: async (data) => {
     try {
       const res = await axiosInstance.post('/auth/login', data);
-      set({ authUser: res.data.user });
+      // The server just set a new jwt cookie, so always open a new socket authenticated by it
+      disconnectSocket();
       initSocket(res.data.user._id);
+      set({ authUser: res.data.user });
       toast.success('Logged in successfully');
       return { success: true };
     } catch (error) {

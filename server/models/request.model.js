@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+// declinedBy holds the ids of OTHER donors who declined. The server filters on it (a donor who
+// declined no longer sees the request), but it must never leave the server, so it is dropped
+// from every toJSON (res.json, socket emits) and toObject result. Queries, $addToSet and
+// document getters (request.declinedBy) are unaffected.
+const hideDeclinedBy = (doc, ret) => {
+  delete ret.declinedBy;
+  return ret;
+};
+
 const requestSchema = new mongoose.Schema(
   {
     requesterId: {
@@ -72,7 +81,11 @@ const requestSchema = new mongoose.Schema(
       maxlength: 500,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { transform: hideDeclinedBy },
+    toObject: { transform: hideDeclinedBy },
+  }
 );
 
 // Create a 2dsphere index on the hospitalLocation field for geospatial queries

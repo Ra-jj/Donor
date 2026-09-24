@@ -96,6 +96,21 @@ exports.createRequest = async (req, res) => {
       .map((donor) => roundCoordinatePair(donor.location.coordinates))
       .filter((point) => point && angularDistanceRadians(hospitalLocation, point) <= radiusInRadians);
 
+    // The newBloodRequest payload: only the fields the donor's incoming card reads, so no
+    // requesterId or other user ids. Built before the 201 so a failure here is still a 500.
+    const savedRequest = newRequest.toObject();
+    const requestForDonors = {
+      _id: savedRequest._id,
+      bloodGroup: savedRequest.bloodGroup,
+      unitsNeeded: savedRequest.unitsNeeded,
+      hospitalName: savedRequest.hospitalName,
+      hospitalLocation: savedRequest.hospitalLocation,
+      urgency: savedRequest.urgency,
+      status: savedRequest.status,
+      createdAt: savedRequest.createdAt,
+      requesterName: req.user.name,
+    };
+
     res.status(201).json({
       message: 'Request created and donors matched successfully',
       request: newRequest,
@@ -115,11 +130,7 @@ exports.createRequest = async (req, res) => {
         const isExactMatch = donor.bloodGroup === bloodGroup;
         const matchType = isExactMatch ? 'exact' : 'compatible';
 
-        io.to(donor._id.toString()).emit('newBloodRequest', {
-          ...newRequest.toObject(),
-          requesterName: req.user.name,
-          matchType,
-        });
+        io.to(donor._id.toString()).emit('newBloodRequest', { ...requestForDonors, matchType });
 
         // Send Web Push Notification if the donor is subscribed
         if (donor.pushSubscription) {
@@ -188,7 +199,9 @@ exports.getIncomingRequests = async (req, res) => {
         }
       ]
     })
-      .populate('requesterId', 'name profilePic')
+      // Pending requests reach nearby donors who are strangers to the requester, and the
+      // client reads nothing from requesterId here, so the requester's user id is left out
+      .populate('requesterId', 'name profilePic -_id')
       .sort({ createdAt: -1 });
 
     // Inject matchType tag before sending to client

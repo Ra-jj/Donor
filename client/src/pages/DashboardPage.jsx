@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
-import { getSocket } from '../lib/socket';
+import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import ChatWindow from '../components/ChatWindow';
@@ -255,15 +255,25 @@ const DashboardPage = () => {
       axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
     };
 
-    // Events sent while this client was offline are not replayed, so refetch on reconnect
-    const handleReconnect = () => fetchDashboardData({ silent: true });
+    // Events sent while this client was offline are not replayed, so refetch quietly on every
+    // connect after this socket's first. 'connect' follows both the manager's own reconnects and
+    // the manual retries in lib/socket.js (which fire no 'reconnect'), and it is the only
+    // trigger here, so one reconnect refetches once.
+    let hasConnectedBefore = hasSocketConnectedBefore(socket);
+    // A first connect that followed failed attempts also refetches: events sent while those
+    // attempts were failing were never delivered.
+    const handleConnect = () => {
+      const shouldRefetch = hasConnectedBefore || hadFailedAttempt(socket);
+      hasConnectedBefore = true;
+      if (shouldRefetch) fetchDashboardData({ silent: true });
+    };
 
     socket.on('requestStatusUpdate', handleStatusUpdate);
-    socket.io.on('reconnect', handleReconnect);
+    socket.on('connect', handleConnect);
 
     return () => {
       socket.off('requestStatusUpdate', handleStatusUpdate);
-      socket.io.off('reconnect', handleReconnect);
+      socket.off('connect', handleConnect);
     };
   }, []);
 
