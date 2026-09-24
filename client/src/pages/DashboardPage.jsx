@@ -190,6 +190,8 @@ const DashboardPage = () => {
         toast.success('Request has been marked as fulfilled! Thank you for donating. 🩸', { duration: 5000 });
       } else if (data.status === 'rated') {
         toast.success(`You received a ${data.rating}★ rating! ${data.ratingNote ? '"' + data.ratingNote + '"' : ''}`, { icon: '⭐', duration: 5000 });
+      } else if (data.status === 'cancelled') {
+        toast.error(`${data.requesterName} cancelled their request`, { duration: 5000 });
       }
       
       // Update my requests list to reflect the new status
@@ -201,6 +203,12 @@ const DashboardPage = () => {
       setIncomingRequests((prev) => prev.map(req => 
         req._id === data.requestId ? { ...req, status: data.status === 'rated' ? 'fulfilled' : data.status, rating: data.rating || req.rating, ratingNote: data.ratingNote || req.ratingNote } : req
       ));
+
+      // A cancelled or fulfilled request has no chat, so close it if it is open.
+      // Functional updater because this effect only runs once and cannot read selectedRequestId.
+      if (data.status === 'cancelled' || data.status === 'fulfilled') {
+        setSelectedRequestId((cur) => (cur === data.requestId ? null : cur));
+      }
 
       // Refresh stats after a status change
       axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
@@ -220,7 +228,11 @@ const DashboardPage = () => {
       fetchDashboardData(); // Refresh to get updated state
     } catch (err) {
       console.error(err);
-      toast.error('Failed to update request status');
+      toast.error(err.response?.data?.message || 'Failed to update request status');
+      // 403/404/409 mean the card no longer matches the server, so refresh to drop it
+      if (err.response && [403, 404, 409].includes(err.response.status)) {
+        fetchDashboardData();
+      }
     }
   };
 
@@ -624,6 +636,16 @@ const DashboardPage = () => {
               activeChatRequest = currentList.find(r => r._id === selectedRequestId);
             }
 
+            // Below lg the request list is hidden while a request is selected, so this is the only way back
+            const backToRequestsButton = (
+              <button
+                onClick={() => setSelectedRequestId(null)}
+                className="lg:hidden text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
+              >
+                ← Back to Requests
+              </button>
+            );
+
             if (activeChatRequest && activeChatRequest.status === 'accepted') {
               return (
                 <motion.div 
@@ -636,25 +658,27 @@ const DashboardPage = () => {
                     <div className="text-sm font-semibold opacity-70">
                       Coordinating for: {activeChatRequest.hospitalName}
                     </div>
-                    <button 
-                      onClick={() => setSelectedRequestId(null)}
-                      className="lg:hidden text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
-                    >
-                      ← Back to Requests
-                    </button>
+                    {backToRequestsButton}
                   </div>
                   <ChatWindow requestId={activeChatRequest._id} currentUserId={authUser._id} />
                 </motion.div>
               );
             }
             return (
-              <div className="h-125 bg-base-100 rounded-xl border border-base-300 flex items-center justify-center text-base-content/50 text-center p-8">
-                <div>
-                  <div className="text-4xl mb-4">💬</div>
-                  <h3 className="font-bold text-lg mb-2">Coordination Chat</h3>
-                  <p>When a request is accepted, real-time chat will appear here.</p>
+              <>
+                {selectedRequestId && (
+                  <div className="flex justify-end mb-2 lg:hidden">
+                    {backToRequestsButton}
+                  </div>
+                )}
+                <div className="h-125 bg-base-100 rounded-xl border border-base-300 flex items-center justify-center text-base-content/50 text-center p-8">
+                  <div>
+                    <div className="text-4xl mb-4">💬</div>
+                    <h3 className="font-bold text-lg mb-2">Coordination Chat</h3>
+                    <p>When a request is accepted, real-time chat will appear here.</p>
+                  </div>
                 </div>
-              </div>
+              </>
             );
           })()}
         </div>

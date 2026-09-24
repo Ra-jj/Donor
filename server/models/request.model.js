@@ -78,4 +78,10 @@ const requestSchema = new mongoose.Schema(
 // Create a 2dsphere index on the hospitalLocation field for geospatial queries
 requestSchema.index({ hospitalLocation: '2dsphere' });
 
+// A donor can give blood once per donation window: MongoDB rejects a second 'accepted' request for the same donor (E11000)
+requestSchema.index(
+  { matchedDonorId: 1 },
+  { unique: true, partialFilterExpression: { status: 'accepted' }, name: 'one_active_donation_per_donor' }
+);
+
 module.exports = mongoose.model('Request', requestSchema);
