@@ -93,7 +93,7 @@ const CreateRequestPage = () => {
               </div>
               <h2 className="text-3xl font-display font-bold text-base-content">Request Broadcasted</h2>
               <p className="text-base-content/70 mt-2">
-                We've found <strong>{successData.matchedDonorDetails?.length || 0}</strong> compatible donors near {formData.hospitalName}.
+                We've found <strong>{successData.matchedDonorCount ?? 0}</strong> compatible donors near {formData.hospitalName}.
               </p>
             </div>
             
@@ -106,7 +106,7 @@ const CreateRequestPage = () => {
               }>
                 <DonorMap 
                   hospitalLocation={formData.hospitalLocation}
-                  donorLocations={successData.matchedDonorDetails}
+                  donorLocations={successData.donorPins}
                   interactive={true}
                   height="h-[400px]"
                 />

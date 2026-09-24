@@ -307,22 +307,23 @@ describe('PATCH /api/requests/:id/status', () => {
       expect((await User.findById(donor.id)).isAvailable).toBe(false);
     });
 
-    it('undoes the accept if the requester cancels mid-accept (409, donor stays available)', async () => {
+    it('sends no stale accept when the requester cancels right after the accept commits (409, donor available)', async () => {
       const donor = await registerUser({ bloodGroup: 'O-' });
       const bloodRequest = await createBloodRequest(requester.id);
-      const realFindByIdAndUpdate = User.findByIdAndUpdate.bind(User);
+      const realTransaction = mongoose.connection.transaction.bind(mongoose.connection);
       let hasInjectedCancel = false;
       let cancelRes;
 
-      // Force the interleave: the accept write has landed, then the requester cancels
-      // (restoring the donor) just before the accept marks the donor unavailable.
-      // Flag set BEFORE awaiting so the cancel's own calls cannot re-inject.
-      jest.spyOn(User, 'findByIdAndUpdate').mockImplementation(async (id, update, ...rest) => {
-        if (update && update.isAvailable === false && !hasInjectedCancel) {
+      // With both writes in one transaction, the only gap left is between the accept's
+      // commit and its emit. Run the requester's whole cancel in exactly that gap.
+      // Flag set BEFORE awaiting so the cancel's own transaction cannot re-inject.
+      jest.spyOn(mongoose.connection, 'transaction').mockImplementation(async (fn, options) => {
+        const result = await realTransaction(fn, options);
+        if (!hasInjectedCancel) {
           hasInjectedCancel = true;
           cancelRes = await patchStatus(bloodRequest._id, requester.cookie, 'cancelled');
         }
-        return realFindByIdAndUpdate(id, update, ...rest);
+        return result;
       });
       const socket = spyOnSocket();
 
@@ -332,12 +333,42 @@ describe('PATCH /api/requests/:id/status', () => {
       expect(acceptRes.statusCode).toBe(409);
       expect(acceptRes.body.message).toBe('This request has already been cancelled');
       expect((await Request.findById(bloodRequest._id)).status).toBe('cancelled');
+      // The cancel's own transaction restored the donor in the same commit
       expect((await User.findById(donor.id)).isAvailable).toBe(true);
-      // The requester must not get a stale 'accepted' event
+      // The requester must not get a stale 'accepted' event; the donor still hears about the cancel
       expect(socket.emit).not.toHaveBeenCalledWith(
         'requestStatusUpdate',
         expect.objectContaining({ status: 'accepted' })
       );
+      expect(socket.to).toHaveBeenCalledWith(donor.id);
+      expect(socket.emit).toHaveBeenCalledWith('requestStatusUpdate', expect.objectContaining({ status: 'cancelled' }));
+    });
+
+    it('serialises a cancel sent while the accept transaction is still open (donor ends available)', async () => {
+      const donor = await registerUser({ bloodGroup: 'O-' });
+      const bloodRequest = await createBloodRequest(requester.id);
+      const realFindByIdAndUpdate = User.findByIdAndUpdate.bind(User);
+      let cancelPromise;
+
+      // Send the cancel after the accept has written the request but before it commits.
+      // It is not awaited here: the cancel hits a write conflict on the request and the
+      // driver retries it until the accept commits, so awaiting it here would deadlock.
+      jest.spyOn(User, 'findByIdAndUpdate').mockImplementation(async (id, update, ...rest) => {
+        if (update && update.isAvailable === false && !cancelPromise) {
+          // .then() is what makes supertest actually send the request
+          cancelPromise = patchStatus(bloodRequest._id, requester.cookie, 'cancelled').then((res) => res);
+        }
+        return realFindByIdAndUpdate(id, update, ...rest);
+      });
+
+      const acceptRes = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
+      const cancelRes = await cancelPromise;
+
+      // The accept committed first; whether its response saw the cancel depends on timing
+      expect([200, 409]).toContain(acceptRes.statusCode);
+      expect(cancelRes.statusCode).toBe(200);
+      expect((await Request.findById(bloodRequest._id)).status).toBe('cancelled');
+      expect((await User.findById(donor.id)).isAvailable).toBe(true);
     });
   });
 
@@ -437,6 +468,85 @@ describe('PATCH /api/requests/:id/status', () => {
       expect(res.statusCode).toBe(409);
       expect((await Request.findById(bloodRequest._id)).declinedBy).toHaveLength(0);
     });
+  });
+});
+
+describe('request and donor writes commit together or not at all', () => {
+  let requester;
+  let donor;
+  let consoleErrorSpy;
+
+  beforeEach(async () => {
+    requester = await registerUser({ name: 'Requester', bloodGroup: 'B+', location: HOSPITAL });
+    donor = await registerUser({ bloodGroup: 'O-' });
+    // The controller logs the simulated failure; keep the test output clean but still check it
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  // Makes the donor availability write fail inside the transaction, after the request write
+  const failDonorWriteSetting = (isAvailable) => {
+    const realFindByIdAndUpdate = User.findByIdAndUpdate.bind(User);
+    jest.spyOn(User, 'findByIdAndUpdate').mockImplementation(async (id, update, ...rest) => {
+      if (update && update.isAvailable === isAvailable) {
+        throw new Error('Simulated donor write failure');
+      }
+      return realFindByIdAndUpdate(id, update, ...rest);
+    });
+  };
+
+  const acceptThroughApi = async (bloodRequest) => {
+    const res = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
+    expect(res.statusCode).toBe(200);
+  };
+
+  it('rolls back the accept when the donor write fails (500, still pending, no event)', async () => {
+    const bloodRequest = await createBloodRequest(requester.id);
+    failDonorWriteSetting(false);
+    const socket = spyOnSocket();
+
+    const res = await patchStatus(bloodRequest._id, donor.cookie, 'accepted');
+
+    expect(res.statusCode).toBe(500);
+    const stored = await Request.findById(bloodRequest._id);
+    expect(stored.status).toBe('pending');
+    expect(stored.matchedDonorId).toBeNull();
+    expect((await User.findById(donor.id)).isAvailable).toBe(true);
+    expect(socket.to).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in updateRequestStatus:', 'Simulated donor write failure');
+  });
+
+  it('rolls back the cancel when the donor write fails (500, still accepted, no event)', async () => {
+    const bloodRequest = await createBloodRequest(requester.id);
+    await acceptThroughApi(bloodRequest);
+    failDonorWriteSetting(true);
+    const socket = spyOnSocket();
+
+    const res = await patchStatus(bloodRequest._id, requester.cookie, 'cancelled');
+
+    expect(res.statusCode).toBe(500);
+    const stored = await Request.findById(bloodRequest._id);
+    expect(stored.status).toBe('accepted');
+    expect(stored.matchedDonorId.toString()).toBe(donor.id);
+    expect((await User.findById(donor.id)).isAvailable).toBe(false);
+    expect(socket.to).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in updateRequestStatus:', 'Simulated donor write failure');
+  });
+
+  it('rolls back the fulfil when the donor write fails (500, still accepted, no event)', async () => {
+    const bloodRequest = await createBloodRequest(requester.id);
+    await acceptThroughApi(bloodRequest);
+    failDonorWriteSetting(true);
+    const socket = spyOnSocket();
+
+    const res = await patchFulfill(bloodRequest._id, requester.cookie);
+
+    expect(res.statusCode).toBe(500);
+    const stored = await Request.findById(bloodRequest._id);
+    expect(stored.status).toBe('accepted');
+    expect(stored.fulfilledAt).toBeNull();
+    expect((await User.findById(donor.id)).isAvailable).toBe(false);
+    expect(socket.to).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in fulfillRequest:', 'Simulated donor write failure');
   });
 });
 

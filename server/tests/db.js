@@ -1,19 +1,21 @@
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 
-let mongoServer;
+let replSet;
 
 const connectDB = async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
+  // Transactions need a replica set (a standalone mongod rejects them), and production
+  // runs on an Atlas replica set. One wiredTiger member is enough for the tests.
+  replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+  const uri = replSet.getUri();
   await mongoose.connect(uri);
 };
 
 const closeDB = async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
-  if (mongoServer) {
-    await mongoServer.stop();
+  if (replSet) {
+    await replSet.stop();
   }
 };
 
