@@ -1,0 +1,73 @@
+# Runs the server tests and the client lint + build on every pull request to main and every push to main.
+# GitHub branch protection requires these checks by job name ("Server tests", "Client build"), so
+# rename them there too if they change here. Render's "After CI Checks Pass" waits for every check.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch or PR makes the older run pointless
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Without this, the mongodb-memory-server postinstall in `npm ci` downloads mongod into
+      # server/node_modules/.cache (wiped by every npm ci) instead of the cached folder below
+      MONGOMS_PREFER_GLOBAL_PATH: 'true'
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      # mongodb-memory-server downloads a ~150 MB mongod binary on first use; keep it between runs
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+
+      - run: npm ci
+
+      - run: npm test -- --ci
+
+  client:
+    name: Client build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+
+      # oxlint exits 0 on warnings by default, so make them fail the job
+      - run: npm run lint -- --deny-warnings
+
+      - run: npm run build

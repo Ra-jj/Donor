@@ -1,4 +1,22 @@
 require('dotenv').config();
+const { findMissingEnvVars, PUSH_ENV_VARS } = require('./config/env');
+
+// Refuse to start without required config, instead of starting and failing later at request
+// time. Only when run directly: tests require this file with no MONGO_URI (they use an in-memory
+// database). Prints variable names only, never their values.
+if (require.main === module) {
+  const missingEnvVars = findMissingEnvVars(process.env);
+  if (missingEnvVars.length > 0) {
+    console.error(`Server not started: missing required environment variables: ${missingEnvVars.join(', ')} (see README)`);
+    process.exit(1);
+  }
+
+  const missingPushEnvVars = findMissingEnvVars(process.env, PUSH_ENV_VARS);
+  if (process.env.NODE_ENV === 'production' && missingPushEnvVars.length > 0) {
+    console.warn(`Web push notifications are off: ${missingPushEnvVars.join(', ')} not set`);
+  }
+}
+
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
