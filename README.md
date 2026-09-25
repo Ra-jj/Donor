@@ -75,6 +75,7 @@ Optional server variables:
 | --- | --- | --- |
 | `TRUST_PROXY` | `1` | Express `trust proxy` setting, which decides where `req.ip` (and so every per-IP rate limit) comes from. Accepts a hop count (`0`, `1`, `2`, ...), `true`/`false`, or a comma-separated list of IPs/subnets (e.g. `loopback, 10.0.0.0/8`). `true` trusts every hop, so any client can choose its own `req.ip`, and express-rate-limit logs `ERR_ERL_PERMISSIVE_TRUST_PROXY` for it. |
 | `DEBUG_IP_ENDPOINT` | unset (off) | Set to exactly `1` to register `GET /api/debug/ip`, which returns `{ ip, ips, xff }` as Express sees them. For confirming `TRUST_PROXY` after a deploy only; unset it afterwards. |
+| `CLIENT_DIST_DIR` | `client/dist` | Tests only: where the production server reads the built client from. Leave unset on Render. |
 | `REGISTER_RATE_LIMIT_MAX` | `10` | Sign-ups allowed per IP per hour. When unset and `NODE_ENV=test`, the sign-up limiter is skipped so the test suite can register many users. |
 
 #### Checking `TRUST_PROXY` after a deploy

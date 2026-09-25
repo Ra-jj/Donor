@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ChatWindow from '../components/ChatWindow';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
+import MapErrorBoundary from '../components/MapErrorBoundary';
 import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
 const DonorMap = lazy(() => import('../components/DonorMap'));
@@ -511,14 +512,16 @@ const DashboardPage = () => {
                           <>
                             {req.hospitalLocation?.coordinates && (
                               <div className="w-full relative bg-base-200 border-b border-base-200 overflow-hidden">
-                                <Suspense fallback={<div className="h-37.5 flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
-                                  <DonorMap 
-                                    hospitalLocation={req.hospitalLocation.coordinates} 
-                                    interactive={false}
-                                    userLocation={authUser?.location?.coordinates}
-                                    height="h-37.5"
-                                  />
-                                </Suspense>
+                                <MapErrorBoundary height="h-37.5">
+                                  <Suspense fallback={<div className="h-37.5 flex items-center justify-center"><span className="loading loading-spinner text-primary"></span></div>}>
+                                    <DonorMap
+                                      hospitalLocation={req.hospitalLocation.coordinates}
+                                      interactive={false}
+                                      userLocation={authUser?.location?.coordinates}
+                                      height="h-37.5"
+                                    />
+                                  </Suspense>
+                                </MapErrorBoundary>
                               </div>
                             )}
                             <div className="card-body p-5">

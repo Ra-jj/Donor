@@ -71,10 +71,30 @@ app.use('/api', (_req, res) => {
 });
 
 if (isProduction) {
-  app.use(express.static(path.join(__dirname, "../client/dist")));
+  // The built client. CLIENT_DIST_DIR is only for tests, which serve a small fake build from a
+  // temp dir; left unset, it is client/dist next to this server.
+  const clientDistPath = path.resolve(process.env.CLIENT_DIST_DIR || path.join(__dirname, '../client/dist'));
+
+  // Vite puts only content-hashed files in dist/assets (a changed file gets a new name), so they
+  // can be cached for a year. client/public has no assets/ folder: anything added there would be
+  // copied in un-hashed and cached just as long. A missing file is an error here instead of
+  // falling through to index.html, e.g. an old chunk that a page open across a deploy asks for.
+  app.use('/assets', express.static(path.join(clientDistPath, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
+
+  // Plain-text status (404 for a missing file) rather than Express's default HTML error page
+  app.use('/assets', (err, _req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err.status || 500;
+    if (status >= 500) console.error('Error serving a client asset:', err);
+    res.set('Cache-Control', 'no-store').sendStatus(status);
+  });
+
+  // Everything else at the root (index.html, sw.js, manifest, icons, theme-init.js) keeps
+  // express.static's default max-age=0, so a deploy is picked up on the next visit
+  app.use(express.static(clientDistPath));
 
   app.use((req, res) => {
-    res.sendFile(path.join(__dirname, "../client/dist", "index.html"));
+    res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 }
 

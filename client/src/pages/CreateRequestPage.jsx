@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { MapPinIcon, BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
+import MapErrorBoundary from '../components/MapErrorBoundary';
 
 const DonorMap = lazy(() => import('../components/DonorMap'));
 
@@ -98,19 +99,22 @@ const CreateRequestPage = () => {
             </div>
             
             <div className="w-full relative rounded-2xl overflow-hidden bg-base-200">
-              <Suspense fallback={
-                <div className="h-100 flex flex-col items-center justify-center text-base-content/50">
-                  <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
-                  <p>Loading live map...</p>
-                </div>
-              }>
-                <DonorMap 
-                  hospitalLocation={formData.hospitalLocation}
-                  donorLocations={successData.donorPins}
-                  interactive={true}
-                  height="h-100"
-                />
-              </Suspense>
+              {/* The request is already saved here, so a map failure must not reload or replace this screen */}
+              <MapErrorBoundary height="h-100" note="Your request is live, so there's no need to send it again.">
+                <Suspense fallback={
+                  <div className="h-100 flex flex-col items-center justify-center text-base-content/50">
+                    <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
+                    <p>Loading live map...</p>
+                  </div>
+                }>
+                  <DonorMap
+                    hospitalLocation={formData.hospitalLocation}
+                    donorLocations={successData.donorPins}
+                    interactive={true}
+                    height="h-100"
+                  />
+                </Suspense>
+              </MapErrorBoundary>
             </div>
 
             <div className="mt-8">
