@@ -5,6 +5,34 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rolldownOptions: {
+      output: {
+        // Libraries the first page needs go in their own chunks. Without this, every chunk imports
+        // the entry chunk, so a one-line app change renamed every file and a deploy made returning
+        // visitors (and the service worker's precache) download ~265 kB gzip again, not ~30 kB.
+        // React + router and the other libraries are two groups, so each stays under Vite's 500 kB
+        // warning and a version bump in one leaves the other cached.
+        // $initial keeps libraries only lazy pages use (leaflet, parts of motion) in those pages' chunks.
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
+              tags: ['$initial'],
+              priority: 2,
+            },
+            {
+              name: 'vendor',
+              test: /[\\/]node_modules[\\/]/,
+              tags: ['$initial'],
+              priority: 1,
+            },
+          ],
+        },
+      },
+    },
+  },
   plugins: [
     react(), 
     tailwindcss(),

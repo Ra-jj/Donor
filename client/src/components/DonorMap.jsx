@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
+// Here rather than in index.css: it ships in this lazy chunk's CSS, and Vite waits for it to load
+// before the map renders. Unlayered either way, so it still wins over the Tailwind layers.
+import 'leaflet/dist/leaflet.css';
 
 // Custom hospital pin (MapPinPlus style)
 const hospitalIcon = L.divIcon({
