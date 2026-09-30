@@ -43,13 +43,21 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
-    lastDonationDate: {
+    // A whole-blood donation the donor made OUTSIDE this app (hospital, blood camp), entered by
+    // them on the Profile page; null if they have not given one. It is NOT their last donation
+    // overall: donations completed through the app are read from fulfilled Requests and never
+    // copied here (see utils/donationGap.js, which takes the more recent of the two).
+    // A calendar date, not an instant: stored as 00:00 UTC of the date picked, which is 05:30
+    // IST on that same date, so the IST calendar day the gap rules use is the date the donor chose.
+    lastOutsideDonationDate: {
       type: Date,
       default: null,
     },
     // ONLY the donor's own choice, set from the Profile toggle. Nothing else writes it.
     // "Busy" is derived, never stored here: a donor holding a Request with status 'accepted'
     // and matchedDonorId set to them is busy, and createRequest skips them even when this is true.
+    // The minimum gap after a donation is derived the same way (utils/donationGap.js) and never
+    // writes this either.
     isAvailable: {
       type: Boolean,
       default: true,

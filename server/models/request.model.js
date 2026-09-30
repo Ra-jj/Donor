@@ -97,4 +97,10 @@ requestSchema.index(
   { unique: true, partialFilterExpression: { status: 'accepted' }, name: 'one_active_donation_per_donor' }
 );
 
+// Serves findNextEligibleDonationAt in utils/donationGap.js: one donor's latest fulfilled request, newest first
+requestSchema.index({ matchedDonorId: 1, status: 1, fulfilledAt: -1 });
+
+// Serves createRequest's distinct busy-or-resting donor query: an index scan per $or branch instead of a collection scan
+requestSchema.index({ status: 1, fulfilledAt: 1, matchedDonorId: 1 });
+
 module.exports = mongoose.model('Request', requestSchema);

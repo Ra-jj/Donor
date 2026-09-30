@@ -35,6 +35,8 @@ const HOSPITAL = [77.5946, 12.9716]; // Bangalore
 const NEARBY = [77.6, 12.975]; // ~0.7 km from HOSPITAL
 const FAR_AWAY = [77.8246, 12.9716]; // ~25 km from HOSPITAL, outside the 15 km radius
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 let userCount = 0;
 
 // Register through the API and reuse the cookie register sets. Logging in per
@@ -317,11 +319,34 @@ describe('PATCH /api/requests/:id/status', () => {
         ? await patchFulfill(firstRequest._id, requester.cookie)
         : await patchStatus(firstRequest._id, requester.cookie, 'cancelled');
       expect(endRes.statusCode).toBe(200);
+      if (outcome === 'fulfilled') {
+        // Move the donation to 121 days ago, just outside the 120-day donation gap, so this
+        // checks only that a fulfilled request no longer makes the donor busy
+        await Request.findByIdAndUpdate(firstRequest._id, { fulfilledAt: new Date(Date.now() - 121 * DAY_MS) });
+      }
 
       const res = await patchStatus(secondRequest._id, donor.cookie, 'accepted');
 
       expect(res.statusCode).toBe(200);
       expect((await Request.findById(secondRequest._id)).matchedDonorId.toString()).toBe(donor.id);
+      expect((await User.findById(donor.id)).isAvailable).toBe(true);
+    });
+
+    // Once fulfilled, the donor is inside the donation gap (tests/donationGap.test.js has the rest)
+    it('does not let a donor accept another request right after their donation is fulfilled (403)', async () => {
+      const donor = await registerUser({ bloodGroup: 'O-' });
+      const firstRequest = await createBloodRequest(requester.id);
+      const secondRequest = await createBloodRequest(requester.id);
+      expect((await patchStatus(firstRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+      expect((await patchFulfill(firstRequest._id, requester.cookie)).statusCode).toBe(200);
+
+      const res = await patchStatus(secondRequest._id, donor.cookie, 'accepted');
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toMatch(/^You donated recently\. You can donate again from /);
+      const storedSecond = await Request.findById(secondRequest._id);
+      expect(storedSecond.status).toBe('pending');
+      expect(storedSecond.matchedDonorId).toBeNull();
       expect((await User.findById(donor.id)).isAvailable).toBe(true);
     });
 
@@ -615,6 +640,11 @@ describe('isAvailable is only the donor\'s choice; busy is derived from an accep
       ? await patchFulfill(heldRequest._id, requester.cookie)
       : await patchStatus(heldRequest._id, requester.cookie, 'cancelled');
     expect(endRes.statusCode).toBe(200);
+    if (outcome === 'fulfilled') {
+      // Move the donation to before the donation gap, so isAvailable is the only thing left
+      // that can keep this donor out
+      await Request.findByIdAndUpdate(heldRequest._id, { fulfilledAt: new Date(Date.now() - 200 * DAY_MS) });
+    }
 
     expect((await User.findById(donor.id)).isAvailable).toBe(false);
     const { notifiedRooms, matchedDonorCount } = await createAndSeeWhoMatched();
@@ -635,10 +665,29 @@ describe('isAvailable is only the donor\'s choice; busy is derived from an accep
       ? await patchFulfill(heldRequest._id, requester.cookie)
       : await patchStatus(heldRequest._id, requester.cookie, 'cancelled');
     expect(endRes.statusCode).toBe(200);
+    if (outcome === 'fulfilled') {
+      // Move the donation to 121 days ago, just outside the 120-day donation gap, so this
+      // checks only that a fulfilled request no longer makes the donor busy
+      await Request.findByIdAndUpdate(heldRequest._id, { fulfilledAt: new Date(Date.now() - 121 * DAY_MS) });
+    }
 
     const afterwards = await createAndSeeWhoMatched();
     expect(afterwards.notifiedRooms).toEqual([donor.id]);
     expect(afterwards.matchedDonorCount).toBe(1);
+  });
+
+  // A fulfilled donation starts the donation gap, which is derived like busy: isAvailable is untouched
+  it('keeps an opted-in donor unmatched after their donation is fulfilled, without writing isAvailable', async () => {
+    const donor = await registerUser({ bloodGroup: 'O-' });
+    const heldRequest = await createBloodRequest(requester.id);
+    expect((await patchStatus(heldRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+
+    expect((await patchFulfill(heldRequest._id, requester.cookie)).statusCode).toBe(200);
+
+    const afterwards = await createAndSeeWhoMatched();
+    expect(afterwards.notifiedRooms).toEqual([]);
+    expect(afterwards.matchedDonorCount).toBe(0);
+    expect((await User.findById(donor.id)).isAvailable).toBe(true);
   });
 
   it('does not make a busy donor matchable when they toggle isAvailable to true in their profile', async () => {
