@@ -14,6 +14,13 @@ const {
   angularDistanceRadians,
 } = require('../utils/locationPrivacy');
 const { describePushEndpointProblem } = require('../validators/pushValidator');
+const {
+  getDonationGapCutoff,
+  inAppDonationInGapFilter,
+  noOutsideDonationInGapFilter,
+  findNextEligibleDonationAt,
+  describeDonationGap,
+} = require('../utils/donationGap');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -64,16 +71,22 @@ exports.createRequest = async (req, res) => {
 
     // Busy donors already hold an accepted request, so they are left out even when their own
     // isAvailable choice is true. one_active_donation_per_donor keeps this to one per donor.
-    const busyDonorIds = await Request.distinct('matchedDonorId', { status: 'accepted' });
+    // Donors inside the minimum gap after a donation are left out the same way: those who
+    // donated through the app here, those who reported an outside donation in the User filter.
+    const donationGapCutoff = getDonationGapCutoff();
+    const unavailableDonorIds = await Request.distinct('matchedDonorId', {
+      $or: [{ status: 'accepted' }, inAppDonationInGapFilter(donationGapCutoff)],
+    });
 
     // One query over the wider radius; both donor lists below are filtered from it in JS, so
-    // leaving busy donors out here keeps them out of the notify list AND the count and pins.
-    // Select only what this handler uses: _id for the socket room, bloodGroup for exact vs
-    // compatible, pushSubscription for the push, and location for the two distance checks.
+    // leaving busy and resting donors out here keeps them out of the notify list AND the count
+    // and pins. Select only what this handler uses: _id for the socket room, bloodGroup for
+    // exact vs compatible, pushSubscription for the push, and location for the two distance checks.
     const candidateDonors = await User.find({
-      _id: { $nin: [...busyDonorIds, requesterId] }, // Exclude busy donors and the requester
+      _id: { $nin: [...unavailableDonorIds, requesterId] }, // Exclude busy or resting donors and the requester
       bloodGroup: { $in: compatibleDonorGroups },
       isAvailable: true,
+      ...noOutsideDonationInGapFilter(donationGapCutoff),
       location: {
         $geoWithin: {
           $centerSphere: [hospitalLocation, candidateRadiusInRadians], // [ [lng, lat], radiusInRadians ]
@@ -230,7 +243,13 @@ exports.getIncomingRequests = async (req, res) => {
       (reqDoc) => reqDoc.status === 'accepted' && String(reqDoc.matchedDonorId) === String(donor._id)
     );
 
-    res.status(200).json({ incomingRequests, hasActiveDonation });
+    // A donor inside the donation gap still gets the list, like a busy donor: it shows what is
+    // needed nearby and keeps their own donations (the thank-you card), and they can still
+    // decline. nextEligibleDonationAt (null when they may donate) lets the dashboard disable
+    // Accept and say from when; acceptRequest refuses the accept either way.
+    const nextEligibleDonationAt = await findNextEligibleDonationAt(donor._id, donor.lastOutsideDonationDate);
+
+    res.status(200).json({ incomingRequests, hasActiveDonation, nextEligibleDonationAt });
   } catch (error) {
     console.error('Error in getIncomingRequests:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -244,14 +263,28 @@ const withinDonorRadius = (donor) => ({
   },
 });
 
+// 403 like the other rules about the donor themselves (blood group, radius). The body carries
+// the date too, so a client can show it without parsing the message.
+const rejectInsideDonationGap = (res, nextEligibleDonationAt) =>
+  res.status(403).json({ message: describeDonationGap(nextEligibleDonationAt), nextEligibleDonationAt });
+
 const acceptRequest = async (req, res) => {
   const donor = req.user;
   const requestId = req.params.id;
 
+  // The donation gap depends on the donor's OTHER documents (their fulfilled requests and their
+  // own outside donation date), so it cannot be part of the single-document filter below. It is
+  // checked here, so a donor inside the gap is refused without any write, and again after the
+  // write for the one race this read can miss. req.user was read at the start of this request.
+  const nextEligibleBeforeWrite = await findNextEligibleDonationAt(donor._id, donor.lastOutsideDonationDate);
+  if (nextEligibleBeforeWrite) {
+    return rejectInsideDonationGap(res, nextEligibleBeforeWrite);
+  }
+
   // One atomic write on one document, so no transaction is needed. The donor's User is not
   // written: holding this accepted request is what makes them busy (see createRequest).
-  // Every eligibility rule lives in the filter, so if two donors accept at the same moment
-  // only the first can still match status: 'pending' and the other matches nothing.
+  // Every rule about the request itself lives in the filter, so if two donors accept at the
+  // same moment only the first can still match status: 'pending' and the other matches nothing.
   let request;
   try {
     request = await Request.findOneAndUpdate(
@@ -308,6 +341,33 @@ const acceptRequest = async (req, res) => {
       return res.status(409).json({ message: 'This request has already been accepted by another donor' });
     }
     return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
+  }
+
+  // The race the first gap check cannot see: this donor's previous request is marked fulfilled
+  // AFTER that check but BEFORE the write above. The write could only succeed because that
+  // request had already left 'accepted' (one_active_donation_per_donor), and a fulfil sets
+  // status and fulfilledAt in one write, so this later read always sees the new donation.
+  // The outside date is re-read too, in case the donor saved one meanwhile. This request is
+  // left out: if its requester has already fulfilled it, the accept was valid, and the re-read
+  // below reports it. Nothing has told the requester about the accept yet, so putting the
+  // request back to pending undoes it.
+  const freshDonor = await User.findById(donor._id).select('lastOutsideDonationDate').lean();
+  const nextEligibleAfterWrite = await findNextEligibleDonationAt(
+    donor._id,
+    freshDonor ? freshDonor.lastOutsideDonationDate : null,
+    { excludeRequestId: request._id }
+  );
+  if (nextEligibleAfterWrite) {
+    const undo = await Request.updateOne(
+      { _id: request._id, status: 'accepted', matchedDonorId: donor._id },
+      { $set: { status: 'pending', matchedDonorId: null } }
+    );
+    if (undo.matchedCount === 0) {
+      // Only the requester can move it on from 'accepted', so they cancelled or fulfilled it
+      // in the milliseconds since the write
+      console.warn(`acceptRequest: accept of request ${request._id} by donor ${donor._id} inside the donation gap was not undone: it is no longer accepted by them`);
+    }
+    return rejectInsideDonationGap(res, nextEligibleAfterWrite);
   }
 
   // A cancel or fulfil can still land between our write and this emit, so re-read to avoid

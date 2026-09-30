@@ -61,6 +61,15 @@ export const useAuthStore = create((set) => ({
     }
   },
 
+  // The dashboard gets a fresh nextEligibleDonationAt with every incoming-requests load (for
+  // example right after a donation is marked fulfilled). Keeping it on authUser means the
+  // Profile page shows the same date. Unchanged values return the same state, so nothing re-renders.
+  setNextEligibleDonationAt: (nextEligibleDonationAt) =>
+    set((state) => {
+      if (!state.authUser || state.authUser.nextEligibleDonationAt === nextEligibleDonationAt) return state;
+      return { authUser: { ...state.authUser, nextEligibleDonationAt } };
+    }),
+
   logout: async () => {
     try {
       await axiosInstance.post('/auth/logout');

@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const User = require('../models/user.model');
 const generateTokenAndSetCookie = require('../utils/generateToken');
 const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
+const { withDonationEligibility } = require('../utils/donationGap');
 
 exports.register = async (req, res) => {
   try {
@@ -39,12 +40,12 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
+    // No password; nextEligibleDonationAt as in every user response (null for a new account).
+    // Built before the cookie is set, so a failure here does not leave a half-done sign-in.
+    const userResponse = await withDonationEligibility(newUser);
+
     // Generate token & cookie
     generateTokenAndSetCookie(newUser._id, res);
-
-    // Exclude password from the response
-    const userResponse = newUser.toObject();
-    delete userResponse.password;
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -77,11 +78,12 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials.' });
     }
 
+    // No password, plus when this donor may donate again (the client keeps it on authUser).
+    // Built before the cookie is set, so a failure here does not leave a half-done sign-in.
+    const userResponse = await withDonationEligibility(user);
+
     // Generate token & cookie
     generateTokenAndSetCookie(user._id, res);
-
-    const userResponse = user.toObject();
-    delete userResponse.password;
 
     res.status(200).json({
       message: 'Logged in successfully',
@@ -106,8 +108,9 @@ exports.logout = (req, res) => {
 
 exports.checkAuth = async (req, res) => {
   try {
-    // req.user is attached by the protectRoute middleware
-    res.status(200).json({ user: req.user });
+    // req.user is attached by the protectRoute middleware (without the password). The client's
+    // authUser comes from here, so it also carries when this donor may donate again.
+    res.status(200).json({ user: await withDonationEligibility(req.user) });
   } catch (error) {
     console.error('Error in checkAuth controller:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });

@@ -1,5 +1,6 @@
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
+const { withDonationEligibility } = require('../utils/donationGap');
 
 exports.getStats = async (req, res) => {
   try {
@@ -56,12 +57,14 @@ exports.getStats = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { name, bloodGroup, location, isAvailable } = req.body;
+    const { name, bloodGroup, location, isAvailable, lastOutsideDonationDate } = req.body;
 
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (bloodGroup !== undefined) updates.bloodGroup = bloodGroup;
     if (isAvailable !== undefined) updates.isAvailable = isAvailable;
+    // Already a Date at 00:00 UTC of the chosen day (profileValidator), or null to clear it
+    if (lastOutsideDonationDate !== undefined) updates.lastOutsideDonationDate = lastOutsideDonationDate;
     if (location !== undefined) {
       updates.location = {
         type: 'Point',
@@ -74,7 +77,8 @@ exports.updateProfile = async (req, res) => {
       select: '-password',
     });
 
-    res.status(200).json({ user: updatedUser });
+    // The outside donation date can change when the donor may donate again, so send it back fresh
+    res.status(200).json({ user: updatedUser ? await withDonationEligibility(updatedUser) : null });
   } catch (error) {
     console.error('Error in updateProfile:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });

@@ -1,10 +1,81 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
+import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
-import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon } from '@phosphor-icons/react';
+import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon } from '@phosphor-icons/react';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
+import {
+  DONATION_GAP_DAYS,
+  isInDonationGap,
+  formatIndiaDate,
+  getTodayInIndiaDateString,
+  toDateInputValue,
+} from '../lib/donationGap';
+
+// Re-reads when this donor may donate again, e.g. after a donation is marked fulfilled while this
+// page is open. Not checkAuth: a failed checkAuth sets authUser to null, and ProtectedRoute would
+// then send the donor to /login over a network blip. Only the latest call's answer is applied, so
+// a slow earlier response cannot put back an older date. It is also dropped if authUser was
+// replaced while it was on the way (Save's checkAuth, a sign-in, or another refresh that changed
+// the date), since that newer copy may already hold a later date. An unchanged date keeps the
+// same authUser object, so a refresh that changed nothing does not cause the next one to be dropped.
+let latestEligibilityRefreshId = 0;
+const refreshNextEligibleDonationAt = async () => {
+  latestEligibilityRefreshId += 1;
+  const refreshId = latestEligibilityRefreshId;
+  const authUserAtStart = useAuthStore.getState().authUser;
+  try {
+    const res = await axiosInstance.get('/auth/check');
+    const { authUser, setNextEligibleDonationAt } = useAuthStore.getState();
+    // The id check: the cookie may belong to someone else by now, after a sign-in elsewhere in this browser
+    if (
+      refreshId === latestEligibilityRefreshId &&
+      authUser === authUserAtStart &&
+      res.data.user._id === authUserAtStart?._id
+    ) {
+      setNextEligibleDonationAt(res.data.user.nextEligibleDonationAt ?? null);
+    }
+  } catch (error) {
+    // 401 just means the session ended; the next page load handles that
+    if (error.response?.status !== 401) {
+      console.error('Error refreshing donation eligibility:', error);
+    }
+  }
+};
+
+// Saving an outside donation is never refused, but a donor who gave blood elsewhere while holding
+// an accepted request can no longer make that donation, and the requester is counting on it.
+// With an accepted request, accept's checks leave no in-app donation inside the gap, so being in
+// the gap right after this save means the outside date put them there.
+const warnIfOutsideDonationDuringActiveDonation = async (savedUser, previousOutsideDonationDate) => {
+  const savedOutsideDonationDate = toDateInputValue(savedUser?.lastOutsideDonationDate);
+  const isNewOutsideDonationInGap =
+    Boolean(savedOutsideDonationDate) &&
+    savedOutsideDonationDate !== previousOutsideDonationDate &&
+    isInDonationGap(savedUser.nextEligibleDonationAt);
+  if (!isNewOutsideDonationInGap) return;
+
+  try {
+    // The incoming-requests response already reports hasActiveDonation; only fetched in this rare case
+    const res = await axiosInstance.get('/requests/incoming');
+    if (res.data.hasActiveDonation) {
+      // This popup is white in both themes, and the dark theme's warning yellow is faint on white.
+      // warning-content is the same deep amber in both themes.
+      toast(
+        <span>
+          You have an active donation. Please tell the requester you donated on{' '}
+          <span className="whitespace-nowrap">{formatIndiaDate(savedUser.lastOutsideDonationDate)}</span>.
+        </span>,
+        { icon: <WarningIcon weight="fill" className="w-5 h-5 text-warning-content shrink-0" />, duration: 10000 }
+      );
+    }
+  } catch (error) {
+    // The profile is already saved and confirmed, so only log it
+    console.error('Error checking for an active donation:', error);
+  }
+};
 
 const ProfilePage = () => {
   const { authUser, checkAuth } = useAuthStore();
@@ -17,12 +88,21 @@ const ProfilePage = () => {
     bloodGroup: authUser?.bloodGroup || 'A+',
     isAvailable: authUser?.isAvailable ?? true,
     location: authUser?.location?.coordinates || null,
+    // YYYY-MM-DD while editing; '' means no outside donation
+    lastOutsideDonationDate: toDateInputValue(authUser?.lastOutsideDonationDate),
   });
+
+  // From the saved profile (authUser), not the unsaved date field, so it matches what the server enforces
+  const nextEligibleDonationAt = authUser?.nextEligibleDonationAt;
+  const isResting = isInDonationGap(nextEligibleDonationAt);
 
   const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     const fetchProfileData = async () => {
+      // A donation may have been fulfilled since authUser was last loaded. Outside the
+      // Promise.all: it handles its own errors and must not turn into "Failed to load".
+      refreshNextEligibleDonationAt();
       try {
         const [statsRes, historyRes] = await Promise.all([
           axiosInstance.get('/users/stats'),
@@ -37,6 +117,35 @@ const ProfilePage = () => {
     fetchProfileData();
   }, []);
 
+  // A donation marked fulfilled while this page is open starts the donation gap, which only the
+  // server can date. Registered once and removed on unmount, like the dashboard's listener.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleStatusUpdate = (data) => {
+      if (data.status === 'fulfilled') refreshNextEligibleDonationAt();
+    };
+
+    // A fulfil sent while the socket was down is never replayed, so re-read the date on every
+    // connect after this socket's first, and on a first connect that followed failed attempts.
+    // Same rule as the dashboard's reconnect handler.
+    let hasConnectedBefore = hasSocketConnectedBefore(socket);
+    const handleConnect = () => {
+      const shouldRefresh = hasConnectedBefore || hadFailedAttempt(socket);
+      hasConnectedBefore = true;
+      if (shouldRefresh) refreshNextEligibleDonationAt();
+    };
+
+    socket.on('requestStatusUpdate', handleStatusUpdate);
+    socket.on('connect', handleConnect);
+
+    return () => {
+      socket.off('requestStatusUpdate', handleStatusUpdate);
+      socket.off('connect', handleConnect);
+    };
+  }, []);
+
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (!formData.location) {
@@ -44,12 +153,25 @@ const ProfilePage = () => {
       return;
     }
     setLoading(true);
+    // As saved before this change, so only a newly entered date can bring the warning below
+    const previousOutsideDonationDate = toDateInputValue(authUser?.lastOutsideDonationDate);
     try {
-      await axiosInstance.patch('/users/profile', formData);
+      // An empty date field clears the date: the server takes null for that, not ''
+      const res = await axiosInstance.patch('/users/profile', {
+        ...formData,
+        lastOutsideDonationDate: formData.lastOutsideDonationDate || null,
+      });
       await checkAuth(); // Refresh user in context
+      // A fulfil that lands while checkAuth is in flight is lost from the status line otherwise
+      refreshNextEligibleDonationAt();
       toast.success('Profile updated successfully!');
+      // Not awaited: it handles its own errors, and Save need not wait for it
+      warnIfOutsideDonationDuringActiveDonation(res.data.user, previousOutsideDonationDate);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Update failed');
+      // A rejected field (e.g. a future date) says what is wrong; the top-level message only says "Validation failed"
+      const fieldErrors = error.response?.data?.errors;
+      const firstFieldError = fieldErrors && Object.values(fieldErrors)[0];
+      toast.error(firstFieldError || error.response?.data?.message || 'Update failed');
     } finally {
       setLoading(false);
     }
@@ -143,6 +265,57 @@ const ProfilePage = () => {
                 </span>
               </div>
             </label>
+          </div>
+
+          <div className="md:col-span-2 bg-base-200 p-4 rounded-xl space-y-4">
+            <div role="status" className="flex items-start gap-3">
+              {isResting ? (
+                <HourglassMediumIcon weight="duotone" className="w-6 h-6 text-warning shrink-0" />
+              ) : (
+                <CheckCircleIcon weight="duotone" className="w-6 h-6 text-success shrink-0" />
+              )}
+              <div className="min-w-0">
+                <p className="font-bold">
+                  {isResting ? (
+                    <>You can donate again from <span className="whitespace-nowrap">{formatIndiaDate(nextEligibleDonationAt)}</span></>
+                  ) : (
+                    "You're eligible to donate"
+                  )}
+                </p>
+                <p className="text-sm text-base-content/60 leading-relaxed">
+                  Donors wait {DONATION_GAP_DAYS} days between whole blood donations, counted from your last one.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="last-outside-donation" className="text-sm font-semibold text-base-content/70 block">
+                Last donated outside Donor
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="last-outside-donation"
+                  type="date"
+                  className="input flex-1 min-w-0 rounded-xl bg-base-100"
+                  min="1900-01-01"
+                  max={getTodayInIndiaDateString()}
+                  value={formData.lastOutsideDonationDate}
+                  onChange={e => setFormData({ ...formData, lastOutsideDonationDate: e.target.value })}
+                  aria-describedby="last-outside-donation-help"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, lastOutsideDonationDate: '' })}
+                  disabled={!formData.lastOutsideDonationDate}
+                  className="btn btn-ghost rounded-xl"
+                >
+                  Clear
+                </button>
+              </div>
+              <p id="last-outside-donation-help" className="text-xs text-base-content/60 leading-relaxed">
+                Optional. A donation at a hospital or blood camp. Donations made through Donor are counted for you.
+              </p>
+            </div>
           </div>
 
           <div className="md:col-span-2 flex justify-end mt-4">

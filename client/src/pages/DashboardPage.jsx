@@ -9,6 +9,7 @@ import ChatWindow from '../components/ChatWindow';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
 import MapErrorBoundary from '../components/MapErrorBoundary';
+import { isInDonationGap, formatIndiaDate } from '../lib/donationGap';
 import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
 const DonorMap = lazy(() => import('../components/DonorMap'));
@@ -94,6 +95,11 @@ const DashboardPage = () => {
   const [stats, setStats] = useState(null);
   // Busy donor: already holds an accepted request, so Accept is disabled until it ends
   const [hasActiveDonation, setHasActiveDonation] = useState(false);
+  // Resting donor: donated recently, so Accept is disabled until nextEligibleDonationAt. Kept on
+  // authUser (refreshed by every incoming-requests load below) so Profile shows the same date.
+  const nextEligibleDonationAt = authUser?.nextEligibleDonationAt;
+  const isResting = isInDonationGap(nextEligibleDonationAt);
+  const canAcceptRequests = !hasActiveDonation && !isResting;
 
   // Rating state — tracks which request is being rated
   const [ratingRequestId, setRatingRequestId] = useState(null);
@@ -148,6 +154,9 @@ const DashboardPage = () => {
       setMyRequests(mineRes.data.requests);
       setIncomingRequests(incomingRes.data.incomingRequests);
       setHasActiveDonation(Boolean(incomingRes.data.hasActiveDonation));
+      // Through getState, a module-level reference, so this function (used by the effects
+      // below that run once) depends on nothing that changes between renders
+      useAuthStore.getState().setNextEligibleDonationAt(incomingRes.data.nextEligibleDonationAt ?? null);
       setStats(statsRes.data);
 
       // After a quiet refresh, a selected request that is no longer accepted has no chat,
@@ -259,8 +268,13 @@ const DashboardPage = () => {
         setSelectedRequestId((cur) => (cur === data.requestId ? null : cur));
       }
 
-      // Refresh stats after a status change
-      axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
+      // A fulfilled donation starts this donor's donation gap, which only the server can date,
+      // so reload quietly (stats included). Other changes only need fresh stats.
+      if (data.status === 'fulfilled') {
+        fetchDashboardData({ silent: true });
+      } else {
+        axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
+      }
     };
 
     // Events sent while this client was offline are not replayed, so refetch quietly on every
@@ -461,6 +475,14 @@ const DashboardPage = () => {
                 className="space-y-4"
               >
                 <h2 className="text-xl font-bold mb-4">Requests Needing Your Help</h2>
+                {isResting && (
+                  <div id="donation-gap-notice" role="status" className="bg-success/10 border border-success/20 rounded-2xl p-4 text-sm font-medium text-base-content flex items-start gap-3">
+                    <HandHeartIcon weight="duotone" className="w-6 h-6 text-success shrink-0" />
+                    <p>
+                      Thank you for donating! You can donate again from <span className="whitespace-nowrap">{formatIndiaDate(nextEligibleDonationAt)}</span>. We won't send you requests until then.
+                    </p>
+                  </div>
+                )}
                 {hasActiveDonation && (
                   <div role="status" className="bg-warning/10 border border-warning/20 rounded-2xl p-4 text-sm font-medium text-base-content">
                     You have an active donation. Complete it before accepting another.
@@ -482,7 +504,7 @@ const DashboardPage = () => {
                         onDecline={(id) => handleUpdateStatus(id, 'declined')}
                         onSelect={setSelectedRequestId}
                         isSelected={selectedRequestId === req._id}
-                        canAccept={!hasActiveDonation}
+                        canAccept={canAcceptRequests}
                       >
                         {/* Fulfilled Thank You state for donor */}
                         {req.status === 'fulfilled' ? (
@@ -543,11 +565,25 @@ const DashboardPage = () => {
                               <div className="card-actions justify-end mt-4">
                                 {req.status === 'pending' ? (
                                   <>
-                                    <span className="text-xs text-base-content/30 font-medium self-center mr-2 md:hidden">
-                                      Swipe or tap →
-                                    </span>
+                                    {isResting ? (
+                                      // A row of its own, so both buttons stay together below it
+                                      <span className="w-full text-xs text-base-content/60 font-medium">
+                                        You can donate from <span className="whitespace-nowrap">{formatIndiaDate(nextEligibleDonationAt)}</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-base-content/30 font-medium self-center mr-2 md:hidden">
+                                        Swipe or tap →
+                                      </span>
+                                    )}
                                     <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-error">Decline</button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }} disabled={hasActiveDonation} className="btn btn-sm btn-success text-white">Accept & Help</button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }}
+                                      disabled={!canAcceptRequests}
+                                      aria-describedby={isResting ? 'donation-gap-notice' : undefined}
+                                      className="btn btn-sm btn-success text-white"
+                                    >
+                                      Accept & Help
+                                    </button>
                                   </>
                                 ) : req.status === 'accepted' ? (
                                   <div className="badge badge-success text-white p-3 font-semibold">Accepted by you</div>
