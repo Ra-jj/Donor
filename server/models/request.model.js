@@ -11,10 +11,15 @@ const hideDeclinedBy = (doc, ret) => {
 
 const requestSchema = new mongoose.Schema(
   {
+    // null only on a fulfilled request whose requester deleted their account: the donation is
+    // kept, anonymised, for the donor's history, stats and donation gap (see deleteAccount in
+    // user.controller.js). Every other request of that user is deleted, so it is required there.
     requesterId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: function () {
+        return this.status !== 'fulfilled';
+      },
     },
     bloodGroup: {
       type: String,
@@ -55,6 +60,7 @@ const requestSchema = new mongoose.Schema(
       enum: ['pending', 'accepted', 'fulfilled', 'cancelled'],
       default: 'pending',
     },
+    // Also null on a fulfilled or cancelled request whose donor deleted their account
     matchedDonorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

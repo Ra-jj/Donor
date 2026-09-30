@@ -34,6 +34,137 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 const RADIUS_KM = 15;
 const EARTH_RADIUS_KM = 6378.1;
 
+// IMPORTANT: $centerSphere takes radius in radians.
+// To convert km to radians, divide distance by Earth's radius (6378.1 km).
+const RADIUS_IN_RADIANS = RADIUS_KM / EARTH_RADIUS_KM;
+// Wider, so the same query also returns every donor whose ROUNDED point is within RADIUS_KM
+const CANDIDATE_RADIUS_IN_RADIANS = (RADIUS_KM + PIN_CANDIDATE_MARGIN_KM) / EARTH_RADIUS_KM;
+
+/**
+ * Geospatial query for the donors a pending request may reach, over the wider candidate radius.
+ * Leaves out busy and resting donors, the requester, and every donor who declined the request.
+ * @param {import('mongoose').Document} request - a saved Request document
+ */
+const findCandidateDonors = async (request) => {
+  // Find all donors whose blood group is compatible with the requested blood group
+  const compatibleDonorGroups = getCompatibleDonorGroups(request.bloodGroup);
+
+  // Busy donors already hold an accepted request, so they are left out even when their own
+  // isAvailable choice is true. one_active_donation_per_donor keeps this to one per donor.
+  // Donors inside the minimum gap after a donation are left out the same way: those who
+  // donated through the app here, those who reported an outside donation in the User filter.
+  const donationGapCutoff = getDonationGapCutoff();
+  const unavailableDonorIds = await Request.distinct('matchedDonorId', {
+    $or: [{ status: 'accepted' }, inAppDonationInGapFilter(donationGapCutoff)],
+  });
+
+  // One query over the wider radius; both donor lists in createRequest are filtered from it in
+  // JS, so leaving busy and resting donors out here keeps them out of the notify list AND the
+  // count and pins. Select only what the callers use: _id for the socket room, bloodGroup for
+  // exact vs compatible, pushSubscription for the push, and location for the two distance checks.
+  // declinedBy is always empty on a new request; a reopened one keeps the donors who said no.
+  return User.find({
+    // Exclude busy or resting donors, the requester, and donors who declined
+    _id: { $nin: [...unavailableDonorIds, request.requesterId, ...request.declinedBy] },
+    bloodGroup: { $in: compatibleDonorGroups },
+    isAvailable: true,
+    ...noOutsideDonationInGapFilter(donationGapCutoff),
+    location: {
+      $geoWithin: {
+        // [ [lng, lat], radiusInRadians ]. A copy: casting the query writes into this array,
+        // and the document's own array would then count as modified.
+        $centerSphere: [[...request.hospitalLocation.coordinates], CANDIDATE_RADIUS_IN_RADIANS],
+      },
+    },
+  }).select('_id bloodGroup pushSubscription location');
+};
+
+// Donors to notify: EXACT home within RADIUS_KM, the rule the $centerSphere query applied
+// before (same spherical model, same radius in radians)
+const keepDonorsWithinExactRadius = (request, candidateDonors) =>
+  candidateDonors.filter(
+    (donor) =>
+      angularDistanceRadians(request.hospitalLocation.coordinates, donor.location.coordinates) <= RADIUS_IN_RADIANS
+  );
+
+// The newBloodRequest payload: only the fields the donor's incoming card reads, so no
+// requesterId or other user ids
+const buildRequestForDonors = (request, requesterName) => {
+  const savedRequest = request.toObject();
+  return {
+    _id: savedRequest._id,
+    bloodGroup: savedRequest.bloodGroup,
+    unitsNeeded: savedRequest.unitsNeeded,
+    hospitalName: savedRequest.hospitalName,
+    hospitalLocation: savedRequest.hospitalLocation,
+    urgency: savedRequest.urgency,
+    status: savedRequest.status,
+    createdAt: savedRequest.createdAt,
+    requesterName,
+  };
+};
+
+// Real-time socket events and web push notifications to the donors near a pending request.
+// A try/catch per donor: callers run this after their response has been sent (the outer catch
+// would try a 500), and one failing donor must not stop the rest from being notified.
+const sendNewRequestAlerts = (donorsToNotify, requestForDonors) => {
+  const { bloodGroup, unitsNeeded, hospitalName, requesterName } = requestForDonors;
+
+  donorsToNotify.forEach((donor) => {
+    try {
+      const isExactMatch = donor.bloodGroup === bloodGroup;
+      const matchType = isExactMatch ? 'exact' : 'compatible';
+
+      io.to(donor._id.toString()).emit('newBloodRequest', { ...requestForDonors, matchType });
+
+      // Subscriptions stored before endpoint validation existed are re-checked before any send
+      const pushEndpointProblem =
+        donor.pushSubscription && describePushEndpointProblem(donor.pushSubscription.endpoint);
+      if (pushEndpointProblem) {
+        console.error(`Skipped web push to donor ${donor._id}: ${pushEndpointProblem}`);
+        User.findByIdAndUpdate(donor._id, { pushSubscription: null })
+          .exec()
+          .catch((clearError) => console.error('Failed to clear push subscription:', clearError.message));
+      }
+
+      // Send Web Push Notification if the donor is subscribed
+      if (donor.pushSubscription && !pushEndpointProblem) {
+        const payload = JSON.stringify({
+          title: '🚨 Emergency Blood Request!',
+          body: `${requesterName} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
+          icon: '/pwa-192x192.png',
+          data: { url: '/dashboard' }
+        });
+
+        webpush.sendNotification(donor.pushSubscription, payload).catch((err) => {
+          console.error(`Failed to send web push to donor ${donor._id}:`, err.message);
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            // Subscription expired or invalid, remove it
+            User.findByIdAndUpdate(donor._id, { pushSubscription: null })
+              .exec()
+              .catch((clearError) => console.error('Failed to clear push subscription:', clearError.message));
+          }
+        });
+      }
+    } catch (notifyError) {
+      console.error(`Error notifying donor ${donor._id}:`, notifyError.message);
+    }
+  });
+};
+
+/**
+ * Alerts every compatible, free donor within RADIUS_KM of a pending request, as createRequest
+ * does for a new one. Also used when a request goes back to pending (deleteAccount in
+ * user.controller.js). Rejects only if a query fails; each donor's alert is guarded on its own.
+ * @param {import('mongoose').Document} request - a saved Request document
+ * @param {string} requesterName
+ */
+const notifyNearbyDonors = async (request, requesterName) => {
+  const candidateDonors = await findCandidateDonors(request);
+  sendNewRequestAlerts(keepDonorsWithinExactRadius(request, candidateDonors), buildRequestForDonors(request, requesterName));
+};
+exports.notifyNearbyDonors = notifyNearbyDonors;
+
 exports.createRequest = async (req, res) => {
   try {
     const { bloodGroup, unitsNeeded, hospitalName, hospitalLocation, urgency } = req.body;
@@ -59,46 +190,20 @@ exports.createRequest = async (req, res) => {
 
     await newRequest.save();
 
+    // protectRoute found the requester, but their account deletion (deleteAccount in
+    // user.controller.js) can commit before this save lands, and after its own clean-up has run.
+    // Checked after the write: a check that runs before the commit still sees the requester,
+    // and then that clean-up, which starts after the commit, removes the request instead. No
+    // donor has heard of it yet.
+    if (!(await User.exists({ _id: requesterId }))) {
+      await Request.deleteOne({ _id: newRequest._id });
+      console.warn(`createRequest: requester ${requesterId} no longer exists, so request ${newRequest._id} was removed again`);
+      return res.status(401).json({ message: 'Unauthorized - User not found' });
+    }
+
     // 2. Geospatial query to find matching donors
-    // IMPORTANT: $centerSphere takes radius in radians.
-    // To convert km to radians, divide distance by Earth's radius (6378.1 km).
-    const radiusInRadians = RADIUS_KM / EARTH_RADIUS_KM;
-    // Wider, so the same query also returns every donor whose ROUNDED point is within RADIUS_KM
-    const candidateRadiusInRadians = (RADIUS_KM + PIN_CANDIDATE_MARGIN_KM) / EARTH_RADIUS_KM;
-
-    // Find all donors whose blood group is compatible with the requested blood group
-    const compatibleDonorGroups = getCompatibleDonorGroups(bloodGroup);
-
-    // Busy donors already hold an accepted request, so they are left out even when their own
-    // isAvailable choice is true. one_active_donation_per_donor keeps this to one per donor.
-    // Donors inside the minimum gap after a donation are left out the same way: those who
-    // donated through the app here, those who reported an outside donation in the User filter.
-    const donationGapCutoff = getDonationGapCutoff();
-    const unavailableDonorIds = await Request.distinct('matchedDonorId', {
-      $or: [{ status: 'accepted' }, inAppDonationInGapFilter(donationGapCutoff)],
-    });
-
-    // One query over the wider radius; both donor lists below are filtered from it in JS, so
-    // leaving busy and resting donors out here keeps them out of the notify list AND the count
-    // and pins. Select only what this handler uses: _id for the socket room, bloodGroup for
-    // exact vs compatible, pushSubscription for the push, and location for the two distance checks.
-    const candidateDonors = await User.find({
-      _id: { $nin: [...unavailableDonorIds, requesterId] }, // Exclude busy or resting donors and the requester
-      bloodGroup: { $in: compatibleDonorGroups },
-      isAvailable: true,
-      ...noOutsideDonationInGapFilter(donationGapCutoff),
-      location: {
-        $geoWithin: {
-          $centerSphere: [hospitalLocation, candidateRadiusInRadians], // [ [lng, lat], radiusInRadians ]
-        },
-      },
-    }).select('_id bloodGroup pushSubscription location');
-
-    // Donors to notify: EXACT home within RADIUS_KM, the rule the $centerSphere query applied
-    // before (same spherical model, same radius in radians)
-    const donorsToNotify = candidateDonors.filter(
-      (donor) => angularDistanceRadians(hospitalLocation, donor.location.coordinates) <= radiusInRadians
-    );
+    const candidateDonors = await findCandidateDonors(newRequest);
+    const donorsToNotify = keepDonorsWithinExactRadius(newRequest, candidateDonors);
 
     // What the requester sees depends ONLY on rounded homes. If the count used exact homes,
     // a requester could move the hospital point until a donor drops out of the count and so
@@ -108,22 +213,10 @@ exports.createRequest = async (req, res) => {
     // says "compatible donors near", so that is fine.
     const visibleDonorPoints = candidateDonors
       .map((donor) => roundCoordinatePair(donor.location.coordinates))
-      .filter((point) => point && angularDistanceRadians(hospitalLocation, point) <= radiusInRadians);
+      .filter((point) => point && angularDistanceRadians(hospitalLocation, point) <= RADIUS_IN_RADIANS);
 
-    // The newBloodRequest payload: only the fields the donor's incoming card reads, so no
-    // requesterId or other user ids. Built before the 201 so a failure here is still a 500.
-    const savedRequest = newRequest.toObject();
-    const requestForDonors = {
-      _id: savedRequest._id,
-      bloodGroup: savedRequest.bloodGroup,
-      unitsNeeded: savedRequest.unitsNeeded,
-      hospitalName: savedRequest.hospitalName,
-      hospitalLocation: savedRequest.hospitalLocation,
-      urgency: savedRequest.urgency,
-      status: savedRequest.status,
-      createdAt: savedRequest.createdAt,
-      requesterName: req.user.name,
-    };
+    // Built before the 201 so a failure here is still a 500
+    const requestForDonors = buildRequestForDonors(newRequest, req.user.name);
 
     res.status(201).json({
       message: 'Request created and donors matched successfully',
@@ -137,48 +230,7 @@ exports.createRequest = async (req, res) => {
     // 3. Emit real-time socket events and web push notifications to matched donors.
     // Runs AFTER the response: sendNotification does synchronous encryption work per donor
     // inside the exact radius, which would otherwise be a timing signal on exact homes.
-    // A try/catch per donor: the 201 has already been sent (the outer catch would try a 500),
-    // and one failing donor must not stop the rest from being notified.
-    donorsToNotify.forEach((donor) => {
-      try {
-        const isExactMatch = donor.bloodGroup === bloodGroup;
-        const matchType = isExactMatch ? 'exact' : 'compatible';
-
-        io.to(donor._id.toString()).emit('newBloodRequest', { ...requestForDonors, matchType });
-
-        // Subscriptions stored before endpoint validation existed are re-checked before any send
-        const pushEndpointProblem =
-          donor.pushSubscription && describePushEndpointProblem(donor.pushSubscription.endpoint);
-        if (pushEndpointProblem) {
-          console.error(`Skipped web push to donor ${donor._id}: ${pushEndpointProblem}`);
-          User.findByIdAndUpdate(donor._id, { pushSubscription: null })
-            .exec()
-            .catch((clearError) => console.error('Failed to clear push subscription:', clearError.message));
-        }
-
-        // Send Web Push Notification if the donor is subscribed
-        if (donor.pushSubscription && !pushEndpointProblem) {
-          const payload = JSON.stringify({
-            title: '🚨 Emergency Blood Request!',
-            body: `${req.user.name} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
-            icon: '/pwa-192x192.png',
-            data: { url: '/dashboard' }
-          });
-        
-          webpush.sendNotification(donor.pushSubscription, payload).catch((err) => {
-            console.error(`Failed to send web push to donor ${donor._id}:`, err.message);
-            if (err.statusCode === 410 || err.statusCode === 404) {
-              // Subscription expired or invalid, remove it
-              User.findByIdAndUpdate(donor._id, { pushSubscription: null })
-                .exec()
-                .catch((clearError) => console.error('Failed to clear push subscription:', clearError.message));
-            }
-          });
-        }
-      } catch (notifyError) {
-        console.error(`Error notifying donor ${donor._id}:`, notifyError.message);
-      }
-    });
+    sendNewRequestAlerts(donorsToNotify, requestForDonors);
   } catch (error) {
     console.error('Error in createRequest:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -268,6 +320,20 @@ const withinDonorRadius = (donor) => ({
 const rejectInsideDonationGap = (res, nextEligibleDonationAt) =>
   res.status(403).json({ message: describeDonationGap(nextEligibleDonationAt), nextEligibleDonationAt });
 
+// Puts back to pending an accept that must not stand. The filter matches only while it is still
+// this donor's accept, so it never overwrites what happened to the request since.
+const undoAccept = async (request, donor, reason) => {
+  const undo = await Request.updateOne(
+    { _id: request._id, status: 'accepted', matchedDonorId: donor._id },
+    { $set: { status: 'pending', matchedDonorId: null } }
+  );
+  if (undo.matchedCount === 0) {
+    // The requester cancelled or fulfilled it, or a deletion of this donor's account put it back
+    // to pending, in the milliseconds since the write
+    console.warn(`acceptRequest: accept of request ${request._id} by donor ${donor._id} ${reason} was not undone: it is no longer accepted by them`);
+  }
+};
+
 const acceptRequest = async (req, res) => {
   const donor = req.user;
   const requestId = req.params.id;
@@ -315,7 +381,8 @@ const acceptRequest = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ message: 'Request not found' });
     }
-    if (existing.requesterId.toString() === donor._id.toString()) {
+    // String(): requesterId is null on a fulfilled request whose requester deleted their account
+    if (String(existing.requesterId) === String(donor._id)) {
       return res.status(403).json({ message: 'You cannot accept your own request' });
     }
     if (!isCompatibleDonor(donor.bloodGroup, existing.bloodGroup)) {
@@ -343,30 +410,31 @@ const acceptRequest = async (req, res) => {
     return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
   }
 
-  // The race the first gap check cannot see: this donor's previous request is marked fulfilled
-  // AFTER that check but BEFORE the write above. The write could only succeed because that
-  // request had already left 'accepted' (one_active_donation_per_donor), and a fulfil sets
-  // status and fulfilledAt in one write, so this later read always sees the new donation.
-  // The outside date is re-read too, in case the donor saved one meanwhile. This request is
-  // left out: if its requester has already fulfilled it, the accept was valid, and the re-read
-  // below reports it. Nothing has told the requester about the accept yet, so putting the
-  // request back to pending undoes it.
+  // Two races the reads before the write cannot see, both checked on this one re-read of the
+  // donor. Nothing has told the requester about the accept yet, so putting the request back to
+  // pending undoes it.
   const freshDonor = await User.findById(donor._id).select('lastOutsideDonationDate').lean();
+
+  // 1. protectRoute found the donor, but their account deletion (deleteAccount in
+  // user.controller.js) can commit before this write lands, and after its own clean-up has run
+  if (!freshDonor) {
+    await undoAccept(request, donor, 'by a donor who no longer exists');
+    return res.status(401).json({ message: 'Unauthorized - User not found' });
+  }
+
+  // 2. This donor's previous request is marked fulfilled AFTER the first gap check but BEFORE
+  // the write above. The write could only succeed because that request had already left
+  // 'accepted' (one_active_donation_per_donor), and a fulfil sets status and fulfilledAt in one
+  // write, so this later read always sees the new donation. The outside date is re-read too, in
+  // case the donor saved one meanwhile. This request is left out: if its requester has already
+  // fulfilled it, the accept was valid, and the re-read below reports it.
   const nextEligibleAfterWrite = await findNextEligibleDonationAt(
     donor._id,
-    freshDonor ? freshDonor.lastOutsideDonationDate : null,
+    freshDonor.lastOutsideDonationDate,
     { excludeRequestId: request._id }
   );
   if (nextEligibleAfterWrite) {
-    const undo = await Request.updateOne(
-      { _id: request._id, status: 'accepted', matchedDonorId: donor._id },
-      { $set: { status: 'pending', matchedDonorId: null } }
-    );
-    if (undo.matchedCount === 0) {
-      // Only the requester can move it on from 'accepted', so they cancelled or fulfilled it
-      // in the milliseconds since the write
-      console.warn(`acceptRequest: accept of request ${request._id} by donor ${donor._id} inside the donation gap was not undone: it is no longer accepted by them`);
-    }
+    await undoAccept(request, donor, 'inside the donation gap');
     return rejectInsideDonationGap(res, nextEligibleAfterWrite);
   }
 
@@ -409,10 +477,19 @@ const declineRequest = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ message: 'Request not found' });
     }
-    if (existing.requesterId.toString() === userId.toString()) {
+    if (String(existing.requesterId) === String(userId)) {
       return res.status(403).json({ message: 'You cannot decline your own request' });
     }
     return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
+  }
+
+  // protectRoute found this user, but their account deletion (deleteAccount in
+  // user.controller.js) can commit before this write lands, and after its own clean-up has run.
+  // Checked after the write, as in createRequest, so their id is not left in declinedBy.
+  if (!(await User.exists({ _id: userId }))) {
+    await Request.updateOne({ _id: requestId }, { $pull: { declinedBy: userId } });
+    console.warn(`declineRequest: user ${userId} no longer exists, so their decline of request ${requestId} was removed again`);
+    return res.status(401).json({ message: 'Unauthorized - User not found' });
   }
 
   // Declining only hides the request from this donor; the global status is unchanged.
@@ -442,7 +519,7 @@ const cancelRequest = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ message: 'Request not found' });
     }
-    if (existing.requesterId.toString() !== requester._id.toString()) {
+    if (String(existing.requesterId) !== String(requester._id)) {
       return res.status(403).json({ message: 'Only the requester can cancel this request' });
     }
     return res.status(409).json({ message: `This request has already been ${existing.status}` });
@@ -500,7 +577,7 @@ exports.fulfillRequest = async (req, res) => {
       }
 
       // Only the original requester can mark as fulfilled
-      if (existing.requesterId.toString() !== req.user._id.toString()) {
+      if (String(existing.requesterId) !== String(req.user._id)) {
         return res.status(403).json({ message: 'Only the requester can mark this as fulfilled' });
       }
 
@@ -526,28 +603,56 @@ exports.fulfillRequest = async (req, res) => {
 
 exports.rateRequest = async (req, res) => {
   try {
-    const request = await Request.findById(req.params.id);
-    if (!request) {
-      return res.status(404).json({ message: 'Request not found' });
-    }
-
-    // Only the original requester can rate
-    if (request.requesterId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Only the requester can rate this donation' });
-    }
-
-    if (request.status !== 'fulfilled') {
-      return res.status(400).json({ message: 'Only fulfilled requests can be rated' });
-    }
-
-    if (request.rating !== null) {
-      return res.status(400).json({ message: 'This request has already been rated' });
-    }
-
     const { rating, ratingNote } = req.body;
-    request.rating = rating;
-    request.ratingNote = ratingNote || '';
-    await request.save();
+
+    // One atomic write with every rule in the filter, as in fulfillRequest. A read-then-save
+    // could write the rating after the donor's account deletion had cleared the donation's
+    // donor and rating note, and two ratings sent at once could both be saved.
+    // runValidators: save() checked the rating's range and the note's length, so this does too.
+    const request = await Request.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        requesterId: req.user._id,
+        status: 'fulfilled',
+        rating: null,
+        matchedDonorId: { $ne: null },
+      },
+      { $set: { rating, ratingNote: ratingNote || '' } },
+      { returnDocument: 'after', runValidators: true }
+    );
+
+    if (!request) {
+      // The write matched nothing: read the request to report which rule failed
+      const existing = await Request.findById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: 'Request not found' });
+      }
+
+      // Only the original requester can rate
+      if (String(existing.requesterId) !== String(req.user._id)) {
+        return res.status(403).json({ message: 'Only the requester can rate this donation' });
+      }
+
+      if (existing.status !== 'fulfilled') {
+        return res.status(400).json({ message: 'Only fulfilled requests can be rated' });
+      }
+
+      // 409 for the answers below: the request changed since the card was loaded (a rating from
+      // another tab or device, or the donor's account deletion), so the dashboard reloads it
+      if (existing.rating !== null) {
+        return res.status(409).json({ message: 'This request has already been rated' });
+      }
+
+      // The donor deleted their account (deleteAccount in user.controller.js). A rating would count
+      // towards no one, and its note would be about someone who asked to be erased.
+      if (!existing.matchedDonorId) {
+        return res.status(409).json({ message: 'The donor has deleted their account, so this donation can no longer be rated' });
+      }
+
+      // Every rule holds on this later read, so the request changed between the write and the
+      // read (for example, it was marked fulfilled from another device in that moment)
+      return res.status(409).json({ message: 'This request changed while it was being rated. Please try again.' });
+    }
 
     // Notify the donor they received a rating
     if (request.matchedDonorId) {

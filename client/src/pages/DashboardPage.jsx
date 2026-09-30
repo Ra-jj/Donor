@@ -203,7 +203,9 @@ const DashboardPage = () => {
         </div>, 
         { duration: 6000, icon: '🚨' }
       );
-      setIncomingRequests((prev) => [newRequestData, ...prev]);
+      // A request can be announced again once it is open again (its donor deleted their
+      // account), so replace a card this donor may still hold for it rather than add a second
+      setIncomingRequests((prev) => [newRequestData, ...prev.filter((req) => req._id !== newRequestData._id)]);
     };
 
     socket.on('newBloodRequest', handleNewRequest);
@@ -239,13 +241,19 @@ const DashboardPage = () => {
         toast.success('Request has been marked as fulfilled! Thank you for donating. 🩸', { duration: 5000 });
       } else if (data.status === 'rated') {
         toast.success(`You received a ${data.rating}★ rating! ${data.ratingNote ? '"' + data.ratingNote + '"' : ''}`, { icon: '⭐', duration: 5000 });
+      } else if (data.status === 'cancelled' && data.reason === 'account_deleted') {
+        // The server sends no name for a deleted account
+        toast.error('The requester deleted their account. This request is cancelled.', { duration: 6000 });
       } else if (data.status === 'cancelled') {
         toast.error(`${data.requesterName} cancelled their request`, { duration: 5000 });
+      } else if (data.status === 'pending' && data.reason === 'account_deleted') {
+        // Sent only when the matched donor deletes their account (deleteAccount on the server)
+        toast.error('Your donor deleted their account. Your request is open to donors again.', { duration: 6000 });
       }
       
-      // Update my requests list to reflect the new status
+      // Update my requests list to reflect the new status. Back to pending means no donor.
       setMyRequests((prev) => prev.map(req => 
-        req._id === data.requestId ? { ...req, status: data.status, matchedDonorId: 'temp_id' } : req
+        req._id === data.requestId ? { ...req, status: data.status, matchedDonorId: data.status === 'pending' ? null : 'temp_id' } : req
       ));
 
       // Update incoming requests for the donor side. A cancelled request is gone for the
@@ -262,9 +270,9 @@ const DashboardPage = () => {
         setHasActiveDonation(false);
       }
 
-      // A cancelled, fulfilled or rated request has no chat, so close it if it is open.
+      // A cancelled, fulfilled, rated or reopened request has no chat, so close it if it is open.
       // Functional updater because this effect only runs once and cannot read selectedRequestId.
-      if (['cancelled', 'fulfilled', 'rated'].includes(data.status)) {
+      if (['cancelled', 'fulfilled', 'rated', 'pending'].includes(data.status)) {
         setSelectedRequestId((cur) => (cur === data.requestId ? null : cur));
       }
 
@@ -344,6 +352,13 @@ const DashboardPage = () => {
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Failed to submit rating');
+      // 409: the donor deleted their account since this card loaded, so refresh it
+      if (err.response?.status === 409) {
+        setRatingRequestId(null);
+        setRatingValue(0);
+        setRatingNote('');
+        reloadDashboardData();
+      }
     } finally {
       setRatingLoading(false);
     }
@@ -525,6 +540,9 @@ const DashboardPage = () => {
                                     <p className="text-sm italic text-base-content/60 mt-2">"{req.ratingNote}"</p>
                                   )}
                                 </div>
+                              ) : req.requesterId === null ? (
+                                // Populated as null once the requester has deleted their account
+                                <p className="text-xs text-base-content/40">Not rated. The requester deleted their account.</p>
                               ) : (
                                 <p className="text-xs text-base-content/40">Awaiting rating from requester</p>
                               )}
@@ -678,6 +696,11 @@ const DashboardPage = () => {
                                     <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-37.5" title={req.ratingNote}>"{req.ratingNote}"</span>
                                   )}
                                 </div>
+                              ) : !req.matchedDonorId ? (
+                                /* The donor deleted their account; the server refuses a rating too */
+                                <p className="text-xs text-base-content/50">
+                                  Donated by Deleted user. This donation can't be rated.
+                                </p>
                               ) : ratingRequestId === req._id ? (
                                 /* Rating form is open */
                                 <motion.div

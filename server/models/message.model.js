@@ -25,6 +25,9 @@ const messageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// controllers/message.controller.js getMessages: one request's messages in order
+messageSchema.index({ requestId: 1, createdAt: 1 });
+
 const Message = mongoose.model('Message', messageSchema);
 
 module.exports = Message;

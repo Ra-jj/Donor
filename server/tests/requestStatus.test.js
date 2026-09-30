@@ -584,6 +584,150 @@ describe('PATCH /api/requests/:id/fulfill', () => {
   });
 });
 
+describe('POST /api/requests/:id/rate', () => {
+  let requester;
+  let donor;
+  let bloodRequest;
+
+  const postRating = (requestId, cookie, body) =>
+    request(server)
+      .post(`/api/requests/${requestId}/rate`)
+      .set('Cookie', cookie)
+      .send(body);
+
+  // Every test starts from a request the donor has accepted and the requester has fulfilled
+  beforeEach(async () => {
+    requester = await registerUser({ name: 'Requester', bloodGroup: 'B+', location: HOSPITAL });
+    donor = await registerUser({ bloodGroup: 'O-' });
+    bloodRequest = await createBloodRequest(requester.id);
+    expect((await patchStatus(bloodRequest._id, donor.cookie, 'accepted')).statusCode).toBe(200);
+    expect((await patchFulfill(bloodRequest._id, requester.cookie)).statusCode).toBe(200);
+  });
+
+  it('lets the requester rate a fulfilled donation (200) and notifies the donor', async () => {
+    const socket = spyOnSocket();
+
+    const res = await postRating(bloodRequest._id, requester.cookie, { rating: 4, ratingNote: '  Came quickly  ' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.message).toBe('Rating submitted successfully');
+    // The document AFTER the update, with the note trimmed by the schema as save() did
+    expect(res.body.request).toMatchObject({ rating: 4, ratingNote: 'Came quickly', status: 'fulfilled' });
+    const stored = await Request.findById(bloodRequest._id);
+    expect(stored.rating).toBe(4);
+    expect(stored.ratingNote).toBe('Came quickly');
+    expect(socket.to.mock.calls).toEqual([[donor.id]]);
+    expect(socket.emit).toHaveBeenCalledWith('requestStatusUpdate', {
+      requestId: expect.anything(),
+      status: 'rated',
+      rating: 4,
+      ratingNote: '  Came quickly  ',
+      requesterName: requester.name,
+    });
+  });
+
+  it('refuses a second rating (409), keeps the first and notifies the donor only once', async () => {
+    const socket = spyOnSocket();
+    expect((await postRating(bloodRequest._id, requester.cookie, { rating: 5, ratingNote: 'First' })).statusCode).toBe(200);
+
+    const res = await postRating(bloodRequest._id, requester.cookie, { rating: 1, ratingNote: 'Second' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.message).toBe('This request has already been rated');
+    const stored = await Request.findById(bloodRequest._id);
+    expect(stored.rating).toBe(5);
+    expect(stored.ratingNote).toBe('First');
+    expect(socket.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets exactly one of two concurrent ratings through (one 200, one 409)', async () => {
+    const socket = spyOnSocket();
+
+    const responses = await Promise.all([
+      postRating(bloodRequest._id, requester.cookie, { rating: 5, ratingNote: 'From the phone' }),
+      postRating(bloodRequest._id, requester.cookie, { rating: 2, ratingNote: 'From the laptop' }),
+    ]);
+
+    expect(responses.map((res) => res.statusCode).sort()).toEqual([200, 409]);
+    const winner = responses.find((res) => res.statusCode === 200);
+    const stored = await Request.findById(bloodRequest._id);
+    expect(stored.rating).toBe(winner.body.request.rating);
+    expect(stored.ratingNote).toBe(winner.body.request.ratingNote);
+    expect(socket.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not write a rating when the donor deletes their account between a read and the rating write', async () => {
+    const realFindById = Request.findById.bind(Request);
+    let hasInjectedDeletion = false;
+    let deletionRes;
+
+    // A read-check-save rating calls findById first. The donor's whole account deletion runs
+    // right after that read, and the stale document still names them, so a non-atomic rating
+    // would be saved on a donation whose donor is gone. The atomic rating never calls findById
+    // on its success path, so no deletion happens.
+    jest.spyOn(Request, 'findById').mockImplementation(async (...args) => {
+      const staleDoc = await realFindById(...args);
+      // Flag set BEFORE awaiting: nothing the deletion calls may re-inject
+      if (!hasInjectedDeletion) {
+        hasInjectedDeletion = true;
+        deletionRes = await request(server)
+          .delete('/api/users/me')
+          .set('Cookie', donor.cookie)
+          .send({ password: 'password123' });
+      }
+      return staleDoc;
+    });
+
+    const rateRes = await postRating(bloodRequest._id, requester.cookie, { rating: 5, ratingNote: 'Thank you' });
+
+    const stored = await realFindById(bloodRequest._id); // bypass the spy
+    const deletionSucceeded = Boolean(deletionRes && deletionRes.statusCode === 200);
+    // If the deletion went through, the donation must have no donor and no rating, and the rating must have failed
+    expect(stored.matchedDonorId && String(stored.matchedDonorId)).toBe(deletionSucceeded ? null : donor.id);
+    expect(stored.rating).toBe(deletionSucceeded ? null : 5);
+    expect(rateRes.statusCode).toBe(deletionSucceeded ? 409 : 200);
+  });
+
+  it('refuses a rating once the donor has deleted their account (409)', async () => {
+    const deletionRes = await request(server)
+      .delete('/api/users/me')
+      .set('Cookie', donor.cookie)
+      .send({ password: 'password123' });
+    expect(deletionRes.statusCode).toBe(200);
+
+    const res = await postRating(bloodRequest._id, requester.cookie, { rating: 5 });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.message).toBe('The donor has deleted their account, so this donation can no longer be rated');
+    expect((await Request.findById(bloodRequest._id)).rating).toBeNull();
+  });
+
+  it('does not let anyone but the requester rate (403)', async () => {
+    const res = await postRating(bloodRequest._id, donor.cookie, { rating: 5 });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.message).toBe('Only the requester can rate this donation');
+    expect((await Request.findById(bloodRequest._id)).rating).toBeNull();
+  });
+
+  it('rejects rating a request that is not fulfilled (400)', async () => {
+    const openRequest = await createBloodRequest(requester.id);
+
+    const res = await postRating(openRequest._id, requester.cookie, { rating: 5 });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.message).toBe('Only fulfilled requests can be rated');
+    expect((await Request.findById(openRequest._id)).rating).toBeNull();
+  });
+
+  it('returns 404 for a request that does not exist', async () => {
+    const res = await postRating(new mongoose.Types.ObjectId(), requester.cookie, { rating: 5 });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body.message).toBe('Request not found');
+  });
+});
+
 describe('isAvailable is only the donor\'s choice; busy is derived from an accepted request', () => {
   let requester;
 

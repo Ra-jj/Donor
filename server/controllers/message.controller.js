@@ -1,5 +1,6 @@
 const Message = require('../models/message.model');
 const Request = require('../models/request.model');
+const User = require('../models/user.model');
 const { io } = require('../lib/socket');
 
 exports.getMessages = async (req, res) => {
@@ -25,8 +26,16 @@ exports.getMessages = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to view this chat' });
     }
 
-    // 2. Fetch message history for this specific request
-    const messages = await Message.find({ requestId }).sort({ createdAt: 1 });
+    // 2. Fetch message history for this specific request, between its requester and its current
+    // donor only. A request goes back to pending when its donor deletes their account, and the
+    // next donor must never see a message meant for the one before.
+    const messages = await Message.find({
+      requestId,
+      $or: [
+        { senderId: request.requesterId, receiverId: request.matchedDonorId },
+        { senderId: request.matchedDonorId, receiverId: request.requesterId },
+      ],
+    }).sort({ createdAt: 1 });
 
     res.status(200).json({ messages });
   } catch (error) {
@@ -75,6 +84,35 @@ exports.sendMessage = async (req, res) => {
     });
 
     await newMessage.save();
+
+    // protectRoute found the sender, but their account deletion (deleteAccount in
+    // user.controller.js) can commit before this save lands, and after its own clean-up has run.
+    // Checked after the write: a check that runs before the commit still sees the sender, and
+    // then that clean-up, which starts after the commit, removes the message instead. The
+    // receiver has not been sent it yet.
+    if (!(await User.exists({ _id: senderId }))) {
+      await Message.deleteOne({ _id: newMessage._id });
+      console.warn(`sendMessage: sender ${senderId} no longer exists, so message ${newMessage._id} was removed again`);
+      return res.status(401).json({ message: 'Unauthorized - User not found' });
+    }
+
+    // The receiver's account deletion can land the same way. It puts the request back to pending
+    // (or deletes it) and erases their messages, but a message saved after that clean-up would
+    // stay, with their id, on a request the next donor can accept. Checked after the write for the
+    // same reason as above; the user check also covers an accept by a deleted donor that has not
+    // been undone yet.
+    const isChatStillOpen =
+      (await Request.exists({
+        _id: requestId,
+        status: 'accepted',
+        requesterId: request.requesterId,
+        matchedDonorId: request.matchedDonorId,
+      })) && (await User.exists({ _id: receiverId }));
+    if (!isChatStillOpen) {
+      await Message.deleteOne({ _id: newMessage._id });
+      console.warn(`sendMessage: the chat on request ${requestId} ended before message ${newMessage._id} was saved, so it was removed again`);
+      return res.status(409).json({ message: 'This chat has ended' });
+    }
 
     // 3. Emit via socket to the receiver in real time
     io.to(receiverId.toString()).emit('newMessage', newMessage);

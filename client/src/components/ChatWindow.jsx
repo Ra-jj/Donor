@@ -114,7 +114,16 @@ const ChatWindow = ({ requestId, currentUserId }) => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message');
+      // 409: the chat ended while this was on its way (the other person deleted their account, or
+      // the request was cancelled or fulfilled), and the server did not keep the message
+      if (error.response?.status === 409) {
+        setMessages((prev) => prev.filter((msg) => msg._id !== optimisticMessage._id));
+      }
+      toast.error(
+        error.response?.status === 409
+          ? error.response.data?.message || 'This chat has ended'
+          : 'Failed to send message'
+      );
     }
   };
 
