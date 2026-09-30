@@ -3,9 +3,10 @@ import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
-import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon } from '@phosphor-icons/react';
+import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon, WarningOctagonIcon, TrashIcon } from '@phosphor-icons/react';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
+import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import {
   DONATION_GAP_DAYS,
   isInDonationGap,
@@ -97,6 +98,7 @@ const ProfilePage = () => {
   const isResting = isInDonationGap(nextEligibleDonationAt);
 
   const [locating, setLocating] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -348,7 +350,8 @@ const ProfilePage = () => {
                     <div key={req._id} className="bg-base-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                       <div>
                         <div className="font-bold">{req.hospitalName}</div>
-                        <div className="text-sm text-base-content/60">For {req.requesterId?.name || 'Unknown'} • {new Date(req.fulfilledAt).toLocaleDateString()}</div>
+                        {/* requesterId is null once the requester has deleted their account */}
+                        <div className="text-sm text-base-content/60">For {req.requesterId?.name || 'Deleted user'} • {new Date(req.fulfilledAt).toLocaleDateString()}</div>
                       </div>
                       {req.rating ? (
                         <div className="bg-warning/10 px-3 py-2 rounded-xl flex items-center gap-2">
@@ -372,7 +375,11 @@ const ProfilePage = () => {
                     <div key={req._id} className="bg-base-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                       <div>
                         <div className="font-bold">{req.unitsNeeded} units of {req.bloodGroup}</div>
-                        <div className="text-sm text-base-content/60">{new Date(req.createdAt).toLocaleDateString()}</div>
+                        <div className="text-sm text-base-content/60">
+                          {/* matchedDonorId is null once the donor has deleted their account */}
+                          {req.status === 'fulfilled' && <>Donated by {req.matchedDonorId?.name || 'Deleted user'} • </>}
+                          {new Date(req.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
                       <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>
                         {req.status}
@@ -385,6 +392,23 @@ const ProfilePage = () => {
           </div>
         )}
       </div>
+
+      <section aria-labelledby="delete-account-heading" className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-error/30">
+        <h2 id="delete-account-heading" className="text-xl font-display font-bold mb-2 flex items-center gap-2 text-error">
+          <WarningOctagonIcon weight="duotone" className="w-6 h-6 shrink-0" />
+          Delete account
+        </h2>
+        <p className="text-sm text-base-content/70 leading-relaxed mb-5 max-w-prose">
+          Erase your account for good, after confirming your password. Completed donations stay in the other person's
+          history as "Deleted user".
+        </p>
+        <button type="button" onClick={() => setIsDeleteDialogOpen(true)} className="btn btn-error btn-outline rounded-xl">
+          <TrashIcon weight="bold" className="w-5 h-5" />
+          Delete account
+        </button>
+      </section>
+
+      {isDeleteDialogOpen && <DeleteAccountDialog onClose={() => setIsDeleteDialogOpen(false)} />}
     </div>
   );
 };

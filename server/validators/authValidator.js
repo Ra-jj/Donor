@@ -26,7 +26,13 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+// DELETE /api/users/me: the current password confirms that the account owner is asking
+const deleteAccountSchema = z.object({
+  password: z.string({ error: 'Password is required' }).min(1, 'Password is required'),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
+  deleteAccountSchema,
 };

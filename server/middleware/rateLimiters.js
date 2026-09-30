@@ -34,6 +34,27 @@ const requestLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Limit account deletion attempts per user (req.user._id). Each attempt checks the current
+ * password, so without this a stolen session could be used to guess the password.
+ * Per user rather than per IP: many users share one IP on Indian mobile networks (CGNAT).
+ */
+const deleteAccountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 5,
+  keyGenerator: (req) => {
+    // protectRoute middleware guarantees req.user exists before this limiter hits
+    return req.user._id.toString();
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many attempts to delete your account. Please try again in 15 minutes.',
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const REGISTER_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 // Deliberately loose: mobile carriers in India put many users behind one IP (CGNAT)
 const DEFAULT_REGISTER_LIMIT = 10;
@@ -81,6 +102,7 @@ const registerLimiter = rateLimit({
 module.exports = {
   loginLimiter,
   requestLimiter,
+  deleteAccountLimiter,
   registerLimiter,
   resolveRegisterLimitConfig,
   DEFAULT_REGISTER_LIMIT,
