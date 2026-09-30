@@ -10,6 +10,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import OfflineOverlay from './components/OfflineOverlay';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { lazyPage } from './lib/lazyPage';
+import { runWhenIdle } from './lib/runWhenIdle';
+import { reloadForNewBuildOnRouteChange } from './lib/serviceWorkerUpdate';
 
 // Pages, each in its own chunk so a first visit downloads only the page it opens
 const HomePage = lazyPage(() => import('./pages/HomePage'));
@@ -56,16 +58,6 @@ const pageShownFor = (pathname, authUser) => {
 // and the page throws it to RouteErrorBoundary (which reloads once for a new build) when shown.
 const preloadPage = (page) =>
   page.preload().catch((error) => console.warn('Could not preload page chunk:', error));
-
-// requestIdleCallback is missing in Safari, so fall back to a short timeout there
-const runWhenIdle = (callback) => {
-  if ('requestIdleCallback' in window) {
-    const handle = window.requestIdleCallback(callback, { timeout: 3000 });
-    return () => window.cancelIdleCallback(handle);
-  }
-  const handle = setTimeout(callback, 1000);
-  return () => clearTimeout(handle);
-};
 
 // Shown only while a page's chunk is still downloading. The spinner fades in late, so a quick
 // load shows a moment of empty page area rather than a flashing spinner.
@@ -115,6 +107,13 @@ function App() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // If a new build's service worker took over while this page was open, a route change is when to
+  // reload into it: the reload opens the page being navigated to, and leaving a page loses its
+  // state anyway. Runs before the preload below, so its reload comes first.
+  useEffect(() => {
+    reloadForNewBuildOnRouteChange();
+  }, [location.pathname]);
 
   // Start fetching the page for a new URL right away: on first load it downloads alongside the
   // auth check, and on navigation during the old page's exit animation (AnimatePresence

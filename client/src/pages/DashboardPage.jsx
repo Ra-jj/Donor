@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
+import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,7 +13,7 @@ import MapErrorBoundary from '../components/MapErrorBoundary';
 import { isInDonationGap, formatIndiaDate } from '../lib/donationGap';
 import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
-const DonorMap = lazy(() => import('../components/DonorMap'));
+const DonorMap = lazy(loadDonorMap);
 
 /** Swipeable request card for mobile — drag right to accept, left to decline */
 const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, canAccept, children }) => {
@@ -188,6 +189,10 @@ const DashboardPage = () => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Incoming requests show a map, and a new one can arrive over the socket at any time: load it
+  // now, before a new build can replace it (lib/loadDonorMap.js)
+  useEffect(() => preloadDonorMapWhenIdle(), []);
 
   // Listen for real-time new incoming requests
   useEffect(() => {

@@ -27,7 +27,7 @@ class MapErrorBoundary extends Component {
         <div className="font-semibold text-base-content/80">Map couldn't load</div>
         <div className="text-sm">
           {isChunkLoadError(error)
-            ? 'Check your connection. The map shows again next time you open Donor.'
+            ? 'The map will show next time you open Donor.'
             : 'Something went wrong showing the map.'}
         </div>
         {note && <div className="text-sm font-medium text-base-content/80 mt-1">{note}</div>}
