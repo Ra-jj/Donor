@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { axiosInstance } from '../lib/axios';
 import { initSocket, disconnectSocket } from '../lib/socket';
+import { clearLoginPageMessage, showOnLoginPage } from '../lib/loginPageMessage';
 import toast from 'react-hot-toast';
 
 // Shown inside the delete-account dialog, which stays open, so each says what to do next
@@ -38,6 +39,7 @@ export const useAuthStore = create((set, get) => ({
       // initSocket reuses a live socket only if it was opened for this same user.
       initSocket(res.data.user._id);
       set({ authUser: res.data.user });
+      clearLoginPageMessage();
     } catch (error) {
       // 401 just means "not logged in", which is normal on public pages
       if (error.response?.status !== 401) {
@@ -56,6 +58,7 @@ export const useAuthStore = create((set, get) => ({
       disconnectSocket();
       initSocket(res.data.user._id);
       set({ authUser: res.data.user });
+      clearLoginPageMessage();
       toast.success('Account created successfully');
       return { success: true };
     } catch (error) {
@@ -74,6 +77,7 @@ export const useAuthStore = create((set, get) => ({
       disconnectSocket();
       initSocket(res.data.user._id);
       set({ authUser: res.data.user });
+      clearLoginPageMessage();
       toast.success('Logged in successfully');
       return { success: true };
     } catch (error) {
@@ -125,22 +129,19 @@ export const useAuthStore = create((set, get) => ({
       // Signed out already if another window announced its deletion while this one was on its
       // way. That announcement has said so, so nothing is shown twice.
       const wasSignedIn = Boolean(get().authUser);
+      const isAccountGone = error.response.data?.message === 'Unauthorized - User not found';
+      if (wasSignedIn) showOnLoginPage(isAccountGone ? 'accountGone' : 'sessionEnded');
       set({ authUser: null });
       disconnectSocket();
-      if (error.response.data?.message === 'Unauthorized - User not found') {
-        announceAccountDeleted();
-        if (wasSignedIn) toast.success('This account no longer exists');
-      } else if (wasSignedIn) {
-        toast.error('Your session has ended. Log in again to delete your account.');
-      }
+      if (isAccountGone) announceAccountDeleted();
       return { success: true };
     } finally {
       isDeletingInThisWindow = false;
     }
+    showOnLoginPage('accountDeleted');
     set({ authUser: null });
     disconnectSocket();
     announceAccountDeleted();
-    toast.success('Your account has been deleted');
     return { success: true };
   },
 }));
@@ -150,7 +151,7 @@ export const useAuthStore = create((set, get) => ({
 // and an open delete-account dialog with it. Nothing to do when already signed out.
 authChannel?.addEventListener('message', (event) => {
   if (event.data?.type !== 'account-deleted' || !useAuthStore.getState().authUser || isDeletingInThisWindow) return;
+  showOnLoginPage('accountGone');
   useAuthStore.setState({ authUser: null });
   disconnectSocket();
-  toast.success('This account no longer exists');
 });

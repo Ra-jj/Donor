@@ -1,12 +1,13 @@
-import { useState, Suspense, lazy } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { MapPinIcon, BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
+import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
 import toast from 'react-hot-toast';
 import MapErrorBoundary from '../components/MapErrorBoundary';
 
-const DonorMap = lazy(() => import('../components/DonorMap'));
+const DonorMap = lazy(loadDonorMap);
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const URGENCY_LEVELS = [
@@ -26,6 +27,10 @@ const CreateRequestPage = () => {
     hospitalLocation: null,
     urgency: 'medium'
   });
+
+  // The success screen shows the map: load it now, before a new build can replace it
+  // (lib/loadDonorMap.js)
+  useEffect(() => preloadDonorMapWhenIdle(), []);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {

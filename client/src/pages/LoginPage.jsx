@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { EnvelopeSimpleIcon, LockIcon, SignInIcon, EyeIcon, EyeSlashIcon, DropIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
+import { showLoginPageMessage } from '../lib/loginPageMessage';
 
 const LoginPage = () => {
   const { login } = useAuthStore();
@@ -14,6 +15,11 @@ const LoginPage = () => {
   });
 
   const [errors, setErrors] = useState({});
+
+  // An account deletion that sent the user here leaves its message for this page
+  useEffect(() => {
+    showLoginPageMessage();
+  }, []);
 
   const handleEmailBlur = () => {
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(formData.email)) {

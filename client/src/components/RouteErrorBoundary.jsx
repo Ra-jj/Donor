@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import { WarningCircleIcon } from '@phosphor-icons/react';
 import { isChunkLoadError } from '../lib/chunkLoadError';
+import { isPageReloading, reloadPage } from '../lib/pageReload';
 
 const LAST_CHUNK_RELOAD_KEY = 'donor:lastChunkReloadAt';
 const CHUNK_RELOAD_COOLDOWN_MS = 60 * 1000;
@@ -10,6 +11,9 @@ const CHUNK_RELOAD_COOLDOWN_MS = 60 * 1000;
 // one automatic reload a minute, so a chunk that keeps failing ends on the error screen instead
 // of looping. Returns whether it reloads.
 const reloadForNewBuild = () => {
+  // Already reloading, e.g. into a new build on this route change (serviceWorkerUpdate.js): keep
+  // the spinner up, and leave the cooldown for a chunk that fails after the reload
+  if (isPageReloading()) return true;
   if (!navigator.onLine) return false;
   try {
     const lastReloadAt = Number(sessionStorage.getItem(LAST_CHUNK_RELOAD_KEY));
@@ -20,7 +24,7 @@ const reloadForNewBuild = () => {
     console.warn('Not reloading after a failed chunk load: sessionStorage is unavailable', error);
     return false;
   }
-  window.location.reload();
+  reloadPage();
   return true;
 };
 
