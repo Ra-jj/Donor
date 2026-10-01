@@ -154,7 +154,8 @@ const PrivacyPage = () => (
             request as visible to anyone with a Donor account. Nobody is sent your email or your home location.
           </Item>
           <Item lead="The hospital location">
-            is where your device is when you tap the location button, so create a request at or near the hospital.
+            is the place you pick by searching, which sends what you type to OpenStreetMap Nominatim, or, if you choose
+            “I'm at the hospital – use my location”, where your device is at that moment.
           </Item>
           <Item lead="As the requester,">
             you see how many compatible, available donors are near the hospital, and their positions on a map rounded
@@ -193,7 +194,9 @@ const PrivacyPage = () => (
             and the area of the map you look at.
           </Item>
           <Item lead="OpenStreetMap Nominatim.">
-            If you search for a place at sign-up, your browser sends what you type to Nominatim to find it.
+            When you search for a place at sign-up, or for the hospital on the New Request form, your browser sends what
+            you type to Nominatim to find it, which also shows Nominatim your IP address. Your saved location is never
+            sent with a search.
           </Item>
           <Item lead="Google Fonts.">Your browser loads the app's fonts from Google, which shows Google your IP address.</Item>
         </ul>

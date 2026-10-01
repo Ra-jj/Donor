@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { MapPinIcon, UserIcon, EnvelopeSimpleIcon, LockIcon, DropIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react';
@@ -7,6 +7,9 @@ import toast from 'react-hot-toast';
 import PrivacySummary from '../components/PrivacySummary';
 import PrivacyConsentFields from '../components/PrivacyConsentFields';
 import { findMissingConsentErrors } from '../lib/privacyConsent';
+import { DEVICE_LOCATION_OPTIONS, describeDeviceLocationError } from '../lib/deviceLocation';
+import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH, describePlaceSearchError, normalisePlaceQuery } from '../lib/nominatim';
+import { usePlaceSearch } from '../lib/usePlaceSearch';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 // Prefix of the two consent checkboxes' ids, so the first one left unticked can be focused
@@ -28,6 +31,20 @@ const RegisterPage = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [placeQuery, setPlaceQuery] = useState('');
+  const { search: searchPlace, isSearching: isPlaceSearching, isSearchBlocked: isPlaceSearchBlocked } = usePlaceSearch();
+  // Each press of the location button takes the next number, and a position or error that arrives
+  // for an older press is dropped. A search that sets the location moves the number on, so a slow
+  // position never replaces a place found later.
+  const deviceRequestRef = useRef(0);
+  const isDeviceRequestPendingRef = useRef(false);
+
+  // Leaving the page (e.g. signed up while a position was still on its way) drops that answer and
+  // its "Fetching location..." message, which would otherwise show up on the next page
+  useEffect(() => () => {
+    deviceRequestRef.current += 1;
+    if (isDeviceRequestPendingRef.current) toast.dismiss('geo');
+  }, []);
 
   const handleConsentChange = (name, checked) => {
     setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -48,9 +65,13 @@ const RegisterPage = () => {
       return;
     }
     
+    const requestId = ++deviceRequestRef.current;
+    isDeviceRequestPendingRef.current = true;
     toast.loading('Fetching location...', { id: 'geo' });
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (requestId !== deviceRequestRef.current) return;
+        isDeviceRequestPendingRef.current = false;
         // From the latest form, not this render's: the position can take seconds, and the user
         // may tick a checkbox or type meanwhile
         setFormData((prev) => ({
@@ -60,10 +81,57 @@ const RegisterPage = () => {
         toast.success('Location captured successfully!', { id: 'geo' });
       },
       (error) => {
-        console.error(error);
-        toast.error('Failed to get location. Please allow location access.', { id: 'geo' });
-      }
+        if (requestId !== deviceRequestRef.current) return;
+        isDeviceRequestPendingRef.current = false;
+        console.error('Device location failed:', error);
+        toast.error(`${describeDeviceLocationError(error)} Or search for your area instead.`, { id: 'geo' });
+      },
+      DEVICE_LOCATION_OPTIONS,
     );
+  };
+
+  // Only the first match is used, so only one is asked for (lib/nominatim.js)
+  const handlePlaceSearch = async () => {
+    // Its "Searching..." message is already up, and its answer replaces it
+    if (isPlaceSearching) return;
+    const query = normalisePlaceQuery(placeQuery);
+    if (query.length < MIN_QUERY_LENGTH) {
+      toast.error(`Type at least ${MIN_QUERY_LENGTH} letters of a place name`, { id: 'geoSearch' });
+      return;
+    }
+    // A press of the location button while this search runs is the later choice
+    const deviceRequestAtStart = deviceRequestRef.current;
+    toast.loading('Searching...', { id: 'geoSearch' });
+    try {
+      const places = await searchPlace(query, { limit: 1 });
+      // null: a search started in the same moment is already running, and its answer replaces the message
+      if (places === null) return;
+      if (deviceRequestRef.current !== deviceRequestAtStart) {
+        toast.dismiss('geoSearch');
+        return;
+      }
+      if (places.length > 0) {
+        // Drops a position still on its way from an earlier press of the location button
+        deviceRequestRef.current += 1;
+        isDeviceRequestPendingRef.current = false;
+        toast.dismiss('geo');
+        // From the latest form, as in handleGetLocation
+        setFormData((prev) => ({ ...prev, location: places[0].coordinates }));
+        toast.success(`Location found: ${places[0].name}`, { id: 'geoSearch' });
+      } else {
+        toast.error('No place in India matches that. Try another name.', { id: 'geoSearch' });
+      }
+    } catch (searchError) {
+      const message = describePlaceSearchError(searchError);
+      if (!message) {
+        toast.dismiss('geoSearch');
+        return;
+      }
+      // 'too_soon': nothing was sent, since the wait after the last search isn't over; the
+      // message says so, and it isn't a failure worth logging
+      if (searchError?.code !== 'too_soon') console.error('Place search failed:', searchError);
+      toast.error(message, { id: 'geoSearch' });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -131,7 +199,7 @@ const RegisterPage = () => {
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Full Name</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <UserIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
@@ -166,7 +234,7 @@ const RegisterPage = () => {
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Email</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <EnvelopeSimpleIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
@@ -203,7 +271,7 @@ const RegisterPage = () => {
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Password</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <LockIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
@@ -248,7 +316,7 @@ const RegisterPage = () => {
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Blood Group</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <DropIcon weight="regular" className="h-5 w-5 text-primary/50" />
                 </div>
                 <select 
@@ -306,39 +374,42 @@ const RegisterPage = () => {
 
                 <div className="flex gap-2">
                   <input 
-                    type="text" 
+                    type="search" 
                     id="manual-location-input"
-                    placeholder="E.g. Kolkata, NY, etc." 
+                    enterKeyHint="search"
+                    autoComplete="off"
+                    maxLength={MAX_QUERY_LENGTH}
+                    placeholder="E.g. Salt Lake, Kolkata" 
+                    aria-label="Search for your area"
+                    aria-describedby="register-place-search-credit"
                     className="input w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base"
+                    value={placeQuery}
+                    onChange={(e) => setPlaceQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter searches instead of sending the sign-up form; an input method's
+                      // composition (e.g. Hindi typing) keeps its own Enter
+                      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                      e.preventDefault();
+                      handlePlaceSearch();
+                    }}
                   />
                   <button 
                     type="button" 
                     className="btn btn-secondary rounded-xl font-bold active:scale-98 transition-transform"
-                    onClick={async () => {
-                      const query = document.getElementById('manual-location-input').value;
-                      if (!query) return toast.error('Please enter a city name');
-                      toast.loading('Searching...', { id: 'geoSearch' });
-                      try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-                        const data = await res.json();
-                        if (data && data.length > 0) {
-                          // From the latest form, as in handleGetLocation
-                          setFormData((prev) => ({
-                            ...prev,
-                            location: [parseFloat(data[0].lon), parseFloat(data[0].lat)],
-                          }));
-                          toast.success('Location found!', { id: 'geoSearch' });
-                        } else {
-                          toast.error('City not found. Try another.', { id: 'geoSearch' });
-                        }
-                      } catch {
-                        toast.error('Failed to search location', { id: 'geoSearch' });
-                      }
-                    }}
+                    onClick={handlePlaceSearch}
+                    disabled={isPlaceSearchBlocked}
                   >
                     Search
                   </button>
                 </div>
+                {/* Nominatim's usage policy asks for this attribution next to the search */}
+                <p id="register-place-search-credit" className="text-xs text-base-content/60 leading-relaxed">
+                  Search by OpenStreetMap Nominatim. Data ©{' '}
+                  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" className="underline">
+                    OpenStreetMap contributors
+                  </a>
+                  .
+                </p>
               </div>
               {formData.location ? (
                 <motion.span 

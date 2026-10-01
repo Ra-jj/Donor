@@ -9,7 +9,7 @@
  * Changing the notice means a new version in both places. Every signed-in user then sees the
  * consent screen once, at their next visit, before any other page.
  */
-const PRIVACY_NOTICE_VERSION = '2026-10-01';
+const PRIVACY_NOTICE_VERSION = '2026-10-01.2';
 
 /**
  * The User fields one agreement writes: the notice version and the moment, from the server's clock
