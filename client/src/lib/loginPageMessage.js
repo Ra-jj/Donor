@@ -3,13 +3,15 @@ import { isPageReloading } from './pageReload';
 
 const LOGIN_PAGE_MESSAGE_KEY = 'donor:loginPageMessage';
 
-// Messages about an account deletion that ends on /login. The login page shows them, not the
-// code that signs out: the route change to /login reloads the page if a new build has taken over
-// (serviceWorkerUpdate.js), and a message shown before that reload would be lost with it.
+// Messages about a sign-out that ends on /login (an account deletion, or a session found expired on
+// the privacy consent screen). The login page shows them, not the code that signs out: the route
+// change to /login reloads the page if a new build has taken over (serviceWorkerUpdate.js), and a
+// message shown before that reload would be lost with it.
 const LOGIN_PAGE_MESSAGES = {
   accountDeleted: () => toast.success('Your account has been deleted'),
   accountGone: () => toast.success('This account no longer exists'),
   sessionEnded: () => toast.error('Your session has ended. Log in again to delete your account.'),
+  sessionExpired: () => toast.error('Your session has ended. Please log in again.'),
 };
 
 // Call just before signing out. sessionStorage keeps the message through a reload of this window.

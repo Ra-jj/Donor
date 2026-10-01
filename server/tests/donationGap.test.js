@@ -16,6 +16,7 @@ const {
 } = require('../utils/donationGap');
 const { updateProfileSchema } = require('../validators/profileValidator');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // IST is UTC+5:30 all year. Everything below uses this offset, never the machine's time zone,
@@ -235,7 +236,7 @@ describe('the donation gap through the API', () => {
     const email = `gap.user${userCount}@example.com`;
     const res = await request(server)
       .post('/api/auth/register')
-      .send({ name: name || `Gap User ${userCount}`, email, password: 'password123', bloodGroup, location });
+      .send({ name: name || `Gap User ${userCount}`, email, password: 'password123', bloodGroup, location, ...REGISTRATION_CONSENT });
     expect(res.statusCode).toBe(201);
     return { id: res.body.user._id, name: res.body.user.name, email, cookie: res.headers['set-cookie'], body: res.body };
   };

@@ -12,6 +12,7 @@ const {
   DEFAULT_REGISTER_LIMIT,
 } = require('../middleware/rateLimiters');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // supertest dials 127.0.0.1, so bind there explicitly. request(app) binds `::`, and another
 // local app on the same ephemeral port can answer instead.
@@ -43,6 +44,7 @@ const newUser = (index) => ({
   password: 'password123',
   bloodGroup: 'A+',
   location: [88.3639, 22.5726],
+  ...REGISTRATION_CONSENT,
 });
 
 // express-rate-limit reports config problems (e.g. ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) by

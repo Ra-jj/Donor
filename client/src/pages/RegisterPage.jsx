@@ -4,8 +4,13 @@ import { motion } from 'motion/react';
 import { MapPinIcon, UserIcon, EnvelopeSimpleIcon, LockIcon, DropIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
+import PrivacySummary from '../components/PrivacySummary';
+import PrivacyConsentFields from '../components/PrivacyConsentFields';
+import { findMissingConsentErrors } from '../lib/privacyConsent';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+// Prefix of the two consent checkboxes' ids, so the first one left unticked can be focused
+const CONSENT_ID_PREFIX = 'register';
 
 const RegisterPage = () => {
   const { register } = useAuthStore();
@@ -17,9 +22,17 @@ const RegisterPage = () => {
     password: '',
     bloodGroup: '',
     location: null, // [lng, lat]
+    // The two separate agreements, both unticked until the user ticks them; sent as booleans
+    acceptPrivacy: false,
+    confirmAdult: false,
   });
 
   const [errors, setErrors] = useState({});
+
+  const handleConsentChange = (name, checked) => {
+    setFormData((prev) => ({ ...prev, [name]: checked }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
 
   const handleEmailBlur = () => {
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(formData.email)) {
@@ -38,10 +51,12 @@ const RegisterPage = () => {
     toast.loading('Fetching location...', { id: 'geo' });
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setFormData({
-          ...formData,
+        // From the latest form, not this render's: the position can take seconds, and the user
+        // may tick a checkbox or type meanwhile
+        setFormData((prev) => ({
+          ...prev,
           location: [position.coords.longitude, position.coords.latitude],
-        });
+        }));
         toast.success('Location captured successfully!', { id: 'geo' });
       },
       (error) => {
@@ -59,9 +74,17 @@ const RegisterPage = () => {
       setErrors(prev => ({ ...prev, email: 'Please enter a valid email address (e.g. name@domain.com)' }));
       return;
     }
+    // Both boxes must be ticked; shown together with a missing location so one submit finds both
+    const missingConsentErrors = findMissingConsentErrors(formData);
     if (!formData.location) {
-      setErrors(prev => ({ ...prev, location: 'Please provide your location to help match you with nearby emergencies.' }));
+      setErrors(prev => ({ ...prev, location: 'Please provide your location to help match you with nearby emergencies.', ...missingConsentErrors }));
       toast.error('Please provide your location to help match you with nearby emergencies.');
+      return;
+    }
+    const firstMissingConsent = Object.keys(missingConsentErrors)[0];
+    if (firstMissingConsent) {
+      setErrors(prev => ({ ...prev, ...missingConsentErrors }));
+      document.getElementById(`${CONSENT_ID_PREFIX}-${firstMissingConsent}`)?.focus();
       return;
     }
     setLoading(true);
@@ -262,11 +285,18 @@ const RegisterPage = () => {
               className="form-control mt-2"
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Location</span></label>
+              {/* Read before the browser asks for location access, which only the button below triggers */}
+              <p id="register-location-help" className="text-xs text-base-content/60 leading-relaxed mb-3">
+                Used to match you with blood requests within 15 km. Other users never see your exact location; anyone
+                with a Donor account who asks for blood near you can see it rounded to about 1 km, without your name.
+                Search sends the place you type to OpenStreetMap.
+              </p>
               <div className="flex flex-col gap-3">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
                   onClick={handleGetLocation}
+                  aria-describedby="register-location-help"
                 >
                   <MapPinIcon weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
                   {formData.location ? 'Location Captured ✓' : 'Click to Get Current Location'}
@@ -292,10 +322,11 @@ const RegisterPage = () => {
                         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
                         const data = await res.json();
                         if (data && data.length > 0) {
-                          setFormData({
-                            ...formData,
+                          // From the latest form, as in handleGetLocation
+                          setFormData((prev) => ({
+                            ...prev,
                             location: [parseFloat(data[0].lon), parseFloat(data[0].lat)],
-                          });
+                          }));
                           toast.success('Location found!', { id: 'geoSearch' });
                         } else {
                           toast.error('City not found. Try another.', { id: 'geoSearch' });
@@ -328,8 +359,24 @@ const RegisterPage = () => {
               )}
             </motion.div>
 
+            {/* Privacy summary and the two agreements, above the button that creates the account */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(5)}
+              className="space-y-4 pt-4"
+            >
+              <PrivacySummary />
+              <PrivacyConsentFields
+                idPrefix={CONSENT_ID_PREFIX}
+                values={formData}
+                errors={errors}
+                onChange={handleConsentChange}
+              />
+            </motion.div>
+
             {/* Submit */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(6)}

@@ -14,6 +14,26 @@ const describeDeleteAccountError = (error) => {
   return data?.message || `Account deletion failed (HTTP ${status}). Please try again.`;
 };
 
+// Shown on the consent screen, which stays up, so each says what to do next
+const describePrivacyConsentError = (error) => {
+  if (!error.response) return 'No response from the server. Check your connection and try again.';
+  const { status, data } = error.response;
+  if (status >= 500) return "Your answer couldn't be saved on the server. Please try again.";
+  return data?.message || `Your answer couldn't be saved (HTTP ${status}). Please try again.`;
+};
+
+// A user who has not agreed to the current Privacy Notice sees only the consent screen (App.jsx),
+// which needs no live events, so their socket waits until they agree (acceptPrivacyNotice). Call
+// before authUser changes, so pages rendered for this user subscribe to this user's socket.
+// initSocket reuses a live socket only if it was opened for this same user.
+const connectSocketIfConsented = (user) => {
+  if (user.needsPrivacyConsent) {
+    disconnectSocket();
+    return;
+  }
+  initSocket(user._id);
+};
+
 // Every window of this browser shares one jwt cookie, so a deletion signs all of them out, but
 // only the window that sent it hears the answer. This channel tells the others. One object both
 // sends and receives: a BroadcastChannel never gets its own messages, but a second object with
@@ -35,9 +55,8 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get('/auth/check');
-      // Socket first, so components rendered for this user subscribe to this user's socket.
-      // initSocket reuses a live socket only if it was opened for this same user.
-      initSocket(res.data.user._id);
+      // Socket first, so components rendered for this user subscribe to this user's socket
+      connectSocketIfConsented(res.data.user);
       set({ authUser: res.data.user });
       clearLoginPageMessage();
     } catch (error) {
@@ -56,7 +75,7 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post('/auth/register', data);
       // The server just set a new jwt cookie, so always open a new socket authenticated by it
       disconnectSocket();
-      initSocket(res.data.user._id);
+      connectSocketIfConsented(res.data.user);
       set({ authUser: res.data.user });
       clearLoginPageMessage();
       toast.success('Account created successfully');
@@ -75,7 +94,7 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post('/auth/login', data);
       // The server just set a new jwt cookie, so always open a new socket authenticated by it
       disconnectSocket();
-      initSocket(res.data.user._id);
+      connectSocketIfConsented(res.data.user);
       set({ authUser: res.data.user });
       clearLoginPageMessage();
       toast.success('Logged in successfully');
@@ -86,6 +105,33 @@ export const useAuthStore = create((set, get) => ({
       }
       toast.error(error.response?.data?.message || 'Login failed');
       return { success: false };
+    }
+  },
+
+  // The consent screen's Continue. The server records the current notice version with its own
+  // time and answers with the same user object as checkAuth, now with needsPrivacyConsent false, so
+  // App swaps the consent screen for the page that was asked for. No reload, nothing else changes.
+  // A 401 means the session ended elsewhere (a logout in another window, or an expired or deleted
+  // account), so sign out as other 401s do and answer signedOut. The consent screen then goes to
+  // /login, which shows the message: the routes alone would not, since '/' shows a signed-out user
+  // the home page.
+  acceptPrivacyNotice: async ({ acceptPrivacy, confirmAdult }) => {
+    try {
+      const res = await axiosInstance.post('/users/privacy-consent', { acceptPrivacy, confirmAdult });
+      connectSocketIfConsented(res.data.user);
+      set({ authUser: res.data.user });
+      return { success: true };
+    } catch (error) {
+      if (error.response?.status === 401) {
+        showOnLoginPage('sessionExpired');
+        set({ authUser: null });
+        disconnectSocket();
+        return { success: false, signedOut: true };
+      }
+      if (error.response?.data?.errors) {
+        return { success: false, errors: error.response.data.errors };
+      }
+      return { success: false, message: describePrivacyConsentError(error) };
     }
   },
 

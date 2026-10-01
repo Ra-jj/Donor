@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+// One agreement to the privacy notice. Both fields are always written together, so an agreement
+// never exists without its version or its time.
+const privacyConsentSchema = new mongoose.Schema(
+  {
+    version: { type: String, required: true },
+    // The server's clock when the user agreed
+    acceptedAt: { type: Date, required: true },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -65,6 +76,30 @@ const userSchema = new mongoose.Schema(
     profilePic: {
       type: String,
       default: '',
+    },
+    // The privacy notice version this user last agreed to, and when; null for an account created
+    // before consent was recorded. Written only by sign-up and POST /api/users/privacy-consent,
+    // from utils/privacyConsent.js, never from a request body: PATCH /api/users/profile cannot
+    // reach it (its validator drops unknown fields and updateProfile copies named fields only).
+    // Deleting the account deletes this document, and the record with it.
+    privacyConsent: {
+      type: privacyConsentSchema,
+      default: null,
+    },
+    // When the user confirmed they are 18 or older, set with every agreement above
+    adultConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+    // Every agreement this user has given, oldest first, appended in the same write that sets
+    // privacyConsent (utils/privacyConsent.js), so an agreement to an older version is still on
+    // record after a new one replaces privacyConsent. Repeating an agreement already recorded adds
+    // nothing. Never sent to anyone, the user included (withDonationEligibility leaves it out),
+    // and deleted with this document.
+    privacyConsentHistory: {
+      type: [privacyConsentSchema],
+      // Not []: a stale document saved later would write [] over entries added since it was loaded
+      default: undefined,
     },
   },
   { timestamps: true }

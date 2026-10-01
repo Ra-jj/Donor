@@ -176,6 +176,9 @@ const LoginPage = () => {
               Don't have an account?{' '}
               <Link to="/register" className="text-primary font-bold hover:underline">Sign Up</Link>
             </p>
+            <p className="mt-3 text-sm">
+              <Link to="/privacy" className="text-base-content/60 font-medium underline hover:text-primary">Privacy Notice</Link>
+            </p>
           </motion.div>
         </div>
       </motion.div>

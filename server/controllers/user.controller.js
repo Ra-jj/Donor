@@ -6,6 +6,7 @@ const Message = require('../models/message.model');
 const { io } = require('../lib/socket');
 const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
 const { withDonationEligibility } = require('../utils/donationGap');
+const { buildPrivacyConsentUpdate, privacyConsentMissingFilter } = require('../utils/privacyConsent');
 const { notifyNearbyDonors } = require('./request.controller');
 
 exports.getStats = async (req, res) => {
@@ -87,6 +88,35 @@ exports.updateProfile = async (req, res) => {
     res.status(200).json({ user: updatedUser ? await withDonationEligibility(updatedUser) : null });
   } catch (error) {
     console.error('Error in updateProfile:', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+// POST /api/users/privacy-consent. privacyConsentSchema has already required acceptPrivacy and
+// confirmAdult to be true. Records the current notice version with the server's time, so a user
+// who signed up before consent was recorded, or agreed to an older notice, can keep using the app.
+exports.recordPrivacyConsent = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Written only while the current version is still missing. A repeat (a double click, a second
+    // tab) changes nothing, so acceptedAt stays the moment they first agreed to this version and
+    // the consent history gets no second entry for it.
+    await User.updateOne(
+      { _id: userId, ...privacyConsentMissingFilter() },
+      buildPrivacyConsentUpdate(),
+      { runValidators: true }
+    );
+
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      // The account was deleted since protectRoute read it
+      return res.status(401).json({ message: 'Unauthorized - User not found' });
+    }
+
+    res.status(200).json({ user: await withDonationEligibility(user) });
+  } catch (error) {
+    console.error('Error in recordPrivacyConsent:', error.message);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };

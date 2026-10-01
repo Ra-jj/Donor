@@ -13,6 +13,7 @@ const {
   angularDistanceRadians,
 } = require('../utils/locationPrivacy');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // A number that prints with at most 2 decimal places, e.g. 77.6, -23.55 or 180
 const AT_MOST_TWO_DECIMALS = /^-?\d+(\.\d{1,2})?$/;
@@ -209,7 +210,7 @@ describe('POST /api/requests donor privacy', () => {
     const email = `${name.toLowerCase().replace(/\s+/g, '.')}.${userCount}@example.com`;
     const res = await request(server)
       .post('/api/auth/register')
-      .send({ name, email, password: 'password123', bloodGroup, location });
+      .send({ name, email, password: 'password123', bloodGroup, location, ...REGISTRATION_CONSENT });
     expect(res.statusCode).toBe(201);
     return { id: res.body.user._id, name, email, location, cookie: res.headers['set-cookie'] };
   };

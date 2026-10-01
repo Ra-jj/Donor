@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'motion/react';
 import { 
-  UserPlusIcon, HandHeartIcon, CheckCircleIcon, ArrowRightIcon, DropIcon, 
-  ShieldCheckIcon, LightningIcon, ChatCircleDotsIcon, MapPinIcon,
+  UserPlusIcon, HandHeartIcon, CheckCircleIcon, ArrowRightIcon, DropIcon,
+  LightningIcon, ChatCircleDotsIcon, MapPinIcon,
   HeartIcon, HeartbeatIcon
 } from '@phosphor-icons/react';
 
@@ -13,12 +12,12 @@ const STEPS = [
   {
     icon: UserPlusIcon,
     title: "Sign Up",
-    description: "Create your account in seconds. We verify basic details to keep the platform secure."
+    description: "Create your account in seconds with your name, email, blood group and location."
   },
   {
     icon: HandHeartIcon,
     title: "Request or Respond",
-    description: "Hospitals broadcast critical needs. Compatible donors are notified instantly."
+    description: "Ask for blood for a patient at a hospital. Compatible donors within 15 km are alerted right away."
   },
   {
     icon: CheckCircleIcon,
@@ -29,24 +28,15 @@ const STEPS = [
 
 const TRUST_ITEMS = [
   { icon: LightningIcon, label: "Real-time Matching" },
-  { icon: ShieldCheckIcon, label: "Verified Donors" },
-  { icon: ChatCircleDotsIcon, label: "Encrypted Chat" },
+  { icon: DropIcon, label: "Blood-Group Matching" },
+  { icon: ChatCircleDotsIcon, label: "In-App Chat" },
   { icon: MapPinIcon, label: "15km Radius" },
 ];
 
 const STATS = [
-  { value: "500+", label: "Donors Registered" },
-  { value: "24/7", label: "Real-time Platform" },
-  { value: "< 3 min", label: "Avg. Match Time" },
-];
-
-const LIVE_ACTIVITIES = [
-  { bloodGroup: "A+", location: "Kolkata", time: "2 min ago" },
-  { bloodGroup: "O-", location: "Mumbai", time: "5 min ago" },
-  { bloodGroup: "B+", location: "Delhi", time: "8 min ago" },
-  { bloodGroup: "AB+", location: "Bangalore", time: "12 min ago" },
-  { bloodGroup: "O+", location: "Chennai", time: "15 min ago" },
-  { bloodGroup: "A-", location: "Hyderabad", time: "19 min ago" },
+  { value: "15 km", label: "Matching Radius" },
+  { value: "8", label: "Blood Groups Matched" },
+  { value: "0", label: "Ads or Trackers" },
 ];
 
 /* ──────────────────────────── COMPONENTS ─────────────────────────── */
@@ -60,30 +50,11 @@ const AnimatedStat = ({ value, label }) => (
     transition={{ duration: 0.5 }}
     className="text-center"
   >
-    <div className="text-3xl md:text-4xl font-display font-extrabold text-base-content tracking-tight">
+    <div className="text-3xl md:text-4xl font-display font-extrabold text-base-content tracking-tight whitespace-nowrap">
       {value}
     </div>
     <div className="text-sm text-base-content/50 font-medium mt-1">{label}</div>
   </motion.div>
-);
-
-/** Live activity row — simple, clean, no motion needed for static items */
-const ActivityRow = ({ activity, isNew }) => (
-  <div
-    className={`flex items-center gap-3 py-3 px-4 rounded-xl border transition-all duration-500 ${
-      isNew ? 'bg-primary/3 border-primary/15' : 'bg-base-100 border-base-300/60'
-    }`}
-  >
-    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-      <DropIcon weight="fill" className="w-4 h-4 text-primary" />
-    </div>
-    <div className="flex-1 min-w-0">
-      <span className="text-sm font-medium text-base-content">
-        <strong className="text-primary">{activity.bloodGroup}</strong> blood matched in {activity.location}
-      </span>
-    </div>
-    <span className="text-xs text-base-content/40 font-medium shrink-0">{activity.time}</span>
-  </div>
 );
 
 /* ──────────────────────────── MAIN PAGE ──────────────────────────── */
@@ -91,25 +62,6 @@ const ActivityRow = ({ activity, isNew }) => (
 const HomePage = () => {
   const { scrollYProgress } = useScroll();
   const backgroundY = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
-
-  // Cycle through live activities — one new entry fades in at the top every 5s
-  const [visibleActivities, setVisibleActivities] = useState(
-    LIVE_ACTIVITIES.slice(0, 4).map((a, i) => ({ ...a, uid: i }))
-  );
-  const uidCounter = useRef(4);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setVisibleActivities((prev) => {
-        const nextDataIndex = uidCounter.current % LIVE_ACTIVITIES.length;
-        const newEntry = { ...LIVE_ACTIVITIES[nextDataIndex], uid: uidCounter.current };
-        uidCounter.current += 1;
-        // Add new entry to the top, drop the oldest from the bottom
-        return [newEntry, ...prev.slice(0, 3)];
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="w-full overflow-hidden">
@@ -173,8 +125,7 @@ const HomePage = () => {
             transition={{ duration: 0.6, delay: 0.8 }}
             className="text-lg md:text-xl text-base-content/55 max-w-xl mx-auto mb-10 leading-relaxed font-body font-normal"
           >
-            A fast, direct, and reliable way for hospitals to broadcast critical 
-            blood shortages and coordinate with verified local donors.
+            A fast, direct way to ask for blood near a hospital and reach compatible donors nearby.
           </motion.p>
 
           {/* CTAs */}
@@ -281,53 +232,9 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ═══════════════ LIVE ACTIVITY PULSE ═══════════════ */}
-      <section className="py-24 md:py-32 bg-base-100 border-y border-base-300/60">
-        <div className="container mx-auto px-4 max-w-2xl">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-10"
-          >
-            <div className="inline-flex items-center gap-2 text-sm font-semibold text-base-content/50 mb-4">
-              <span 
-                className="w-2 h-2 rounded-full bg-error inline-block"
-                style={{ animation: 'pulse-dot 2s ease-in-out infinite' }}
-              />
-              LIVE ACTIVITY
-            </div>
-            <h2 className="text-3xl md:text-4xl font-display font-extrabold text-base-content tracking-tight mb-4">
-              Happening right now
-            </h2>
-            <p className="text-base-content/50 max-w-md mx-auto font-normal">
-              Real matches being made on the platform.
-            </p>
-          </motion.div>
-
-          <div className="space-y-3 overflow-hidden">
-            {visibleActivities.map((activity, index) => {
-              const slideFrom = activity.uid % 2 === 0 ? -40 : 40;
-              return (
-              <motion.div
-                key={activity.uid}
-                initial={index === 0 ? { opacity: 0, x: slideFrom } : { opacity: 1, x: 0 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-              >
-                <ActivityRow 
-                  activity={activity}
-                  isNew={index === 0}
-                />
-              </motion.div>);
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ══════════════════════ FINAL CTA ══════════════════════ */}
-      <section className="py-24 md:py-32">
+      {/* No top padding: "How it works" above has the same background, and its bottom padding is the gap */}
+      <section className="pb-24 md:pb-32">
         <div className="container mx-auto px-4 max-w-3xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -348,7 +255,7 @@ const HomePage = () => {
                 Ready to make a difference?
               </h2>
               <p className="text-white/70 max-w-md mx-auto mb-8 font-normal">
-                Join hundreds of donors and hospitals already using Donor to save lives in real time.
+                Sign up as a donor, or ask for blood when someone needs it.
               </p>
               <Link
                 to="/register"
@@ -371,9 +278,10 @@ const HomePage = () => {
               <span className="text-lg font-display font-extrabold text-base-content tracking-tight">Donor</span>
             </div>
             
-            <div className="flex items-center gap-6 text-sm text-base-content/40 font-medium">
+            <div className="flex items-center gap-6 text-sm text-base-content/70 font-medium">
               <Link to="/register" className="hover:text-base-content transition-colors">Sign up</Link>
               <Link to="/login" className="hover:text-base-content transition-colors">Log in</Link>
+              <Link to="/privacy" className="hover:text-base-content transition-colors">Privacy</Link>
             </div>
 
             <p className="text-sm text-base-content/30 font-medium">

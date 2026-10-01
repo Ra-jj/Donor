@@ -3,6 +3,7 @@ const request = require('supertest');
 const app = require('../index');
 const Request = require('../models/request.model');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // supertest dials 127.0.0.1, so bind there explicitly. request(app) binds `::`, and another
 // local app on the same ephemeral port can answer instead.
@@ -37,7 +38,7 @@ describe('Request Endpoints', () => {
       bloodGroup: 'B+',
       location: [77.5946, 12.9716], // Bangalore
     };
-    await request(server).post('/api/auth/register').send(requester);
+    await request(server).post('/api/auth/register').send({ ...requester, ...REGISTRATION_CONSENT });
     const loginRes = await request(server).post('/api/auth/login').send({
       email: requester.email,
       password: requester.password,
