@@ -1,13 +1,16 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { MapPinIcon, BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
+import { BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
 import toast from 'react-hot-toast';
 import MapErrorBoundary from '../components/MapErrorBoundary';
+import HospitalLocationField, { HOSPITAL_SEARCH_INPUT_ID } from '../components/HospitalLocationField';
 
 const DonorMap = lazy(loadDonorMap);
+const MISSING_LOCATION_ERROR =
+  "Choose the hospital from the search results, or use your location if you're at the hospital.";
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const URGENCY_LEVELS = [
@@ -24,52 +27,57 @@ const CreateRequestPage = () => {
     bloodGroup: '',
     unitsNeeded: 1,
     hospitalName: '',
-    hospitalLocation: null,
     urgency: 'medium'
   });
+  // null, or { coordinates: [longitude, latitude], source: 'search' | 'device', name?, addressLine? }
+  // (components/HospitalLocationField.jsx). Only the coordinates are sent.
+  const [hospitalLocation, setHospitalLocation] = useState(null);
 
-  // The success screen shows the map: load it now, before a new build can replace it
-  // (lib/loadDonorMap.js)
+  // The pick preview and the success screen show the map: load it now, before a new build can
+  // replace it (lib/loadDonorMap.js)
   useEffect(() => preloadDonorMapWhenIdle(), []);
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
-    
-    toast.loading('Fetching hospital location...', { id: 'geo' });
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setFormData({
-          ...formData,
-          hospitalLocation: [position.coords.longitude, position.coords.latitude],
-        });
-        toast.success('Location captured successfully!', { id: 'geo' });
-      },
-      (error) => {
-        console.error(error);
-        toast.error('Failed to get location. Please allow location access.', { id: 'geo' });
-      }
-    );
+  const handleHospitalLocationChange = (location) => {
+    setHospitalLocation(location);
+    if (location) setErrors((prev) => ({ ...prev, hospitalLocation: '' }));
+  };
+
+  // The result's name becomes the hospital name, which stays editable
+  const handlePlacePicked = (place) => {
+    setHospitalLocation({
+      coordinates: place.coordinates,
+      source: 'search',
+      name: place.name,
+      addressLine: place.addressLine,
+    });
+    setFormData((prev) => ({ ...prev, hospitalName: place.name }));
+    setErrors((prev) => ({ ...prev, hospitalLocation: '', hospitalName: '' }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
-    if (!formData.hospitalLocation) {
-      setErrors(prev => ({ ...prev, hospitalLocation: 'Please provide the hospital location to match with nearby donors.' }));
-      toast.error('Please provide the hospital location to match with nearby donors.');
+    if (!hospitalLocation) {
+      // Shown, and announced, under the hospital search, which gets the focus
+      setErrors({ hospitalLocation: MISSING_LOCATION_ERROR });
+      document.getElementById(HOSPITAL_SEARCH_INPUT_ID)?.focus();
       return;
     }
 
+    // What is sent, kept for the success screen: the location (and the name field) can still
+    // change while the request is on its way, and the screen must show the request that was made
+    const sentCoordinates = hospitalLocation.coordinates;
+    const sentHospitalName = formData.hospitalName;
     setLoading(true);
     toast.loading('Notifying nearby donors in real-time...', { id: 'createReq' });
 
     try {
-      const res = await axiosInstance.post('/requests', formData);
+      const res = await axiosInstance.post('/requests', {
+        ...formData,
+        hospitalLocation: sentCoordinates,
+      });
       toast.success('Emergency request broadcasted successfully!', { id: 'createReq' });
-      setSuccessData(res.data);
+      setSuccessData({ ...res.data, sentCoordinates, sentHospitalName });
     } catch (error) {
       if (error.response?.data?.errors) {
         setErrors(error.response.data.errors);
@@ -99,7 +107,7 @@ const CreateRequestPage = () => {
               </div>
               <h2 className="text-3xl font-display font-bold text-base-content">Request Broadcasted</h2>
               <p className="text-base-content/70 mt-2">
-                We've found <strong>{successData.matchedDonorCount ?? 0}</strong> compatible donors near {formData.hospitalName}.
+                We've found <strong>{successData.matchedDonorCount ?? 0}</strong> compatible donors near {successData.sentHospitalName}.
               </p>
             </div>
             
@@ -113,7 +121,7 @@ const CreateRequestPage = () => {
                   </div>
                 }>
                   <DonorMap
-                    hospitalLocation={formData.hospitalLocation}
+                    hospitalLocation={successData.sentCoordinates}
                     donorLocations={successData.donorPins}
                     interactive={true}
                     height="h-100"
@@ -161,19 +169,36 @@ const CreateRequestPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
 
-            {/* Hospital Name */}
+            {/* Hospital: found by search, or the device's position as a backup */}
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(0)}
               className="form-control"
             >
-              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Hospital / Blood Bank</span></label>
+              <HospitalLocationField
+                location={hospitalLocation}
+                onPlacePicked={handlePlacePicked}
+                onLocationChange={handleHospitalLocationChange}
+                error={errors.hospitalLocation}
+                disabled={loading}
+              />
+            </motion.div>
+
+            {/* Hospital Name */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={fieldDelay(1)}
+              className="form-control"
+            >
+              <label htmlFor="hospital-name" className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Name shown to donors</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <BuildingOfficeIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
+                  id="hospital-name"
                   type="text" 
                   className={`input w-full pl-12 rounded-xl border ${errors.hospitalName ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`} 
                   placeholder="e.g. City General Hospital"
@@ -183,16 +208,23 @@ const CreateRequestPage = () => {
                     setFormData({ ...formData, hospitalName: e.target.value });
                     if (errors.hospitalName) setErrors(prev => ({ ...prev, hospitalName: '' }));
                   }}
+                  aria-invalid={errors.hospitalName ? true : undefined}
+                  aria-describedby={errors.hospitalName ? 'hospital-name-error' : 'hospital-name-help'}
                 />
               </div>
-              {errors.hospitalName && (
+              {errors.hospitalName ? (
                 <motion.span 
+                  id="hospital-name-error"
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.hospitalName}
                 </motion.span>
+              ) : (
+                <span id="hospital-name-help" className="block text-base-content/60 text-xs mt-1.5 ml-1">
+                  Filled in when you choose a search result. You can change it, for example to add the ward.
+                </span>
               )}
             </motion.div>
             
@@ -201,12 +233,12 @@ const CreateRequestPage = () => {
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={fieldDelay(1)}
+                transition={fieldDelay(2)}
                 className="form-control"
               >
                 <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Blood Group</span></label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                     <DropIcon weight="regular" className="h-5 w-5 text-primary/50" />
                   </div>
                   <select 
@@ -239,7 +271,7 @@ const CreateRequestPage = () => {
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={fieldDelay(2)}
+                transition={fieldDelay(3)}
                 className="form-control"
               >
                 <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Units Needed</span></label>
@@ -272,7 +304,7 @@ const CreateRequestPage = () => {
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={fieldDelay(3)}
+              transition={fieldDelay(4)}
               className="form-control"
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Urgency Level</span></label>
@@ -287,41 +319,6 @@ const CreateRequestPage = () => {
                   </option>
                 ))}
               </select>
-            </motion.div>
-
-            {/* Location */}
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={fieldDelay(4)}
-              className="form-control mt-2"
-            >
-              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Hospital Location</span></label>
-              <button 
-                type="button" 
-                className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.hospitalLocation ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
-                onClick={handleGetLocation}
-              >
-                <MapPinIcon weight={formData.hospitalLocation ? "fill" : "regular"} className="w-5 h-5 mr-2" />
-                {formData.hospitalLocation ? 'Location Captured ✓' : 'Click to Get Current Location'}
-              </button>
-              {formData.hospitalLocation ? (
-                <motion.span 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-xs font-semibold text-success mt-3 text-center block"
-                >
-                  Coordinates: {formData.hospitalLocation[0].toFixed(4)}, {formData.hospitalLocation[1].toFixed(4)}
-                </motion.span>
-              ) : errors.hospitalLocation && (
-                <motion.span 
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-error text-sm mt-1.5 text-center block font-medium"
-                >
-                  {errors.hospitalLocation}
-                </motion.span>
-              )}
             </motion.div>
 
             {/* Submit */}

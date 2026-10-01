@@ -78,7 +78,7 @@ const LoginPage = () => {
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Email</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <EnvelopeSimpleIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 
@@ -115,7 +115,7 @@ const LoginPage = () => {
             >
               <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Password</span></label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none">
                   <LockIcon weight="regular" className="h-5 w-5 text-base-content/30" />
                 </div>
                 <input 

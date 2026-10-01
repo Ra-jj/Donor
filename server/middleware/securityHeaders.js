@@ -4,7 +4,8 @@ const helmet = require('helmet');
  * Content-Security-Policy directives for the API and for the built client in client/dist.
  * Every origin below was found in client/index.html, client/src or the built bundle:
  * - Google Fonts: the stylesheet link in index.html and the font files it loads
- * - OpenStreetMap tiles (DonorMap.jsx TileLayer) and Nominatim search (RegisterPage.jsx fetch)
+ * - OpenStreetMap tiles (DonorMap.jsx TileLayer) and Nominatim search (lib/nominatim.js, used at
+ *   sign-up and by the New Request form's hospital search)
  * - socket.io on the same origin, over ws:/wss:
  * - Leaflet: style attributes in divIcon HTML and data: images in leaflet.css
  * The build has no inline scripts: the theme bootstrap is client/public/theme-init.js and the
