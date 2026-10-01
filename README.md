@@ -7,13 +7,17 @@ A real-time web application designed to connect people in need of critical suppl
 ## 🚀 Features
 - **Role-Based Workflows:** Seamless experiences for those creating emergency requests and those stepping up to donate.
 - **Real-Time Request Feeds:** See new donation requests instantly via Socket.io without refreshing the page.
-- **Geolocation Matching:** Users provide their location, allowing the platform to calculate real-world distances using MongoDB `2dsphere` indexes and match donors with nearby emergencies.
-- **Coordination Chat:** Built-in real-time messaging between the requester and the matched donor to coordinate drop-offs.
-- **Fulfillment & Ratings Lifecycle:** Requesters can mark an accepted request as "Fulfilled" once the donation is complete, and submit a 5-star rating for the donor. 
-- **User Profiles & History:** Users can track their "Impact Stats" (lives saved, average rating) and view their historical requests and donations.
-- **Premium Custom UI & Dark Mode:** A beautifully customized interface featuring glassmorphism, Motion animations, Phosphor Icons, and a user-toggled Dark Mode preference that persists via cookies.
-- **PWA & Offline Support:** Installable as a progressive web app. Features a fully-blocking offline overlay that prevents users from interacting with stale, broken forms during network drops in emergencies.
-- **Robust Security:** JWT-based authentication with HTTP-only cookies, password hashing, Zod schema validation for all endpoints, and API rate-limiting to prevent abuse.
+- **Geolocation Matching:** Compatible donors within 15 km of the hospital are found with MongoDB `2dsphere` queries. Requesters see how many donors are nearby on a map, with each donor's position rounded to about 1 km and no names.
+- **Hospital Search:** Requesters pick the hospital by searching OpenStreetMap Nominatim (India only, one search per second, never search-as-you-type), so their own home location is never sent by mistake. "I'm at the hospital – use my location" remains as a backup.
+- **Minimum Gap Between Donations:** Donors who gave whole blood in the last 120 days (India's G.S.R. 166(E)) are not alerted and cannot accept a request. Donations through Donor are counted automatically, and donors can add one made elsewhere.
+- **Coordination Chat:** Real-time messaging between the requester and the matched donor while a request is accepted.
+- **Fulfillment & Ratings Lifecycle:** Requesters mark an accepted request as fulfilled once the donation is done, and can rate the donor from 1 to 5 stars.
+- **User Profiles & History:** Users can see their impact stats (donations, average rating) and their past requests and donations.
+- **Account Deletion:** Users can delete their account from Profile, confirmed with their password. The deletion happens at once, in a single transaction. Finished donations stay in the other person's history as "Deleted user"; everything else is erased, and every other session is signed out.
+- **Privacy Notice & Consent:** A plain-language notice at `/privacy`, written to India's DPDP Act 2023 / DPDP Rules 2025. Sign-up has separate, unticked "I agree" and "I am 18 or older" checkboxes. Users who agreed to an older version are asked again, and every agreement is recorded with its version and time.
+- **Custom UI & Dark Mode:** Glassmorphism, Motion animations, Phosphor Icons, and a dark mode preference that persists via a cookie.
+- **PWA & Offline Support:** Installable as a progressive web app, with a blocking offline overlay so nobody submits a stale form during a network drop. A new deploy takes over at once but never reloads a page that is being used. Pages are code-split, and hashed assets are cached for a year.
+- **Security:** JWT in an httpOnly, SameSite=Strict cookie, bcrypt password hashes, Zod validation on every endpoint, per-route rate limits, Helmet security headers with a strict Content Security Policy, and a startup check that refuses to run without required settings.
 
 ## 🛠 Tech Stack
 **Frontend:**
@@ -24,6 +28,7 @@ A real-time web application designed to connect people in need of critical suppl
 - @phosphor-icons/react (Iconography)
 - Vite PWA Plugin (Offline caching)
 - Socket.io Client
+- Leaflet + React Leaflet (OpenStreetMap maps), OpenStreetMap Nominatim (place search)
 
 **Backend:**
 - Node.js & Express 5
@@ -35,6 +40,8 @@ A real-time web application designed to connect people in need of critical suppl
 - Jest, Supertest & MongoMemoryServer (Testing Suite)
 
 ## 💻 Local Development
+
+Requires **Node.js 24** (pinned in the root `package.json`, the same version CI and Render use).
 
 ### 1. Clone & Install
 ```bash
@@ -93,11 +100,25 @@ npm run dev
 - The backend API will start on `http://localhost:8000`
 
 ### 4. Run Tests
-The backend includes a suite of Jest tests covering authentication, blood compatibility algorithms, and request workflows using an in-memory MongoDB server.
+The backend has about 300 Jest + Supertest tests, which run against an in-memory MongoDB replica set (so transactions work). They cover:
+- authentication and rate limits;
+- blood compatibility and the request lifecycle (including races between accept, cancel and fulfil);
+- the 120-day donation gap;
+- what nearby users are allowed to see;
+- account deletion;
+- privacy consent;
+- socket authentication and security headers.
+
+The tests don't read your `.env` (`tests/setupEnv.js` sets their own values).
 ```bash
 cd server
 npm test
 ```
+
+The client is checked with `npm run lint -- --deny-warnings` and `npm run build` (from `client/`).
+
+### 5. Continuous Integration
+`.github/workflows/ci.yml` runs the server tests and the client lint + build on every pull request and every push to `main`. The `main` branch only accepts changes through pull requests that pass both checks. Dependabot opens monthly dependency update PRs, which go through the same checks.
 
 ## 🌍 Production Deployment
 This application is configured for a single-service full-stack deployment on platforms like Render.
@@ -111,3 +132,7 @@ This application is configured for a single-service full-stack deployment on pla
    - `CLIENT_URL` is not needed: the server serves the client from its own origin, so the browser never makes a cross-origin (CORS) request.
 5. Deploy!
 6. After the CI workflow (`.github/workflows/ci.yml`) has run once on `main`, set the Render service's **Settings → Auto-Deploy** to **After CI Checks Pass**, so a commit that fails the tests or the build is never deployed.
+
+### Privacy notice
+- The contact address shown on `/privacy` is `PRIVACY_CONTACT_EMAIL` in `client/src/config/privacy.js`. Set it to a real, monitored address. Use the same address for `VAPID_SUBJECT` (`mailto:...`).
+- Any change to the notice text needs a new version in both `client/src/config/privacy.js` and `server/utils/privacyConsent.js`; a test fails if they differ. Users then agree to the new version at their next visit.
