@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const app = require('../index');
 const User = require('../models/user.model');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // supertest dials 127.0.0.1, so bind there explicitly. request(app) binds `::`, and another
 // local app on the same ephemeral port can answer instead.
@@ -31,6 +32,7 @@ describe('Auth Endpoints', () => {
     password: 'password123',
     bloodGroup: 'O+',
     location: [77.5946, 12.9716],
+    ...REGISTRATION_CONSENT,
   };
 
   describe('POST /api/auth/register', () => {
@@ -69,6 +71,62 @@ describe('Auth Endpoints', () => {
       // Fails at the controller level
       expect(res.statusCode).toBe(400);
       expect(res.body.message).toBe('Email is already registered.');
+    });
+
+    // Two sign-ups with one email at the same moment both pass the existence check before either
+    // saves, and the unique email index refuses the later save. Its error names the email address.
+    describe('when another sign-up with the same email saves first', () => {
+      beforeAll(async () => {
+        // The save can only be refused once the unique email index exists
+        await User.init();
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      // Everything the server logs meanwhile, as text, and kept out of the test output
+      const captureLogLines = () => {
+        const lines = [];
+        ['log', 'info', 'warn', 'error'].forEach((method) => {
+          jest.spyOn(console, method).mockImplementation((...args) => {
+            lines.push(args.map((arg) => (arg instanceof Error ? `${arg.message}\n${arg.stack}` : String(arg))).join(' '));
+          });
+        });
+        return lines;
+      };
+
+      it('answers like the existence check, with no account, cookie or email address in the logs', async () => {
+        const firstRes = await request(server).post('/api/auth/register').send(validUser);
+        expect(firstRes.statusCode).toBe(201);
+        // This sign-up's check ran before the first one saved, so it found no account
+        jest.spyOn(User, 'findOne').mockResolvedValueOnce(null);
+        const logLines = captureLogLines();
+
+        const res = await request(server).post('/api/auth/register').send(validUser);
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body).toEqual({ message: 'Email is already registered.' });
+        expect(res.headers['set-cookie']).toBeUndefined();
+        expect(await User.countDocuments({ email: validUser.email })).toBe(1);
+        // The refusal is logged by its error code alone
+        expect(logLines).toEqual(['register: save refused by the unique email index (error code 11000)']);
+      });
+
+      it('creates exactly one account when the same email signs up several times at once', async () => {
+        const logLines = captureLogLines();
+
+        const responses = await Promise.all(
+          Array.from({ length: 5 }, () => request(server).post('/api/auth/register').send(validUser))
+        );
+
+        expect(responses.map((res) => res.statusCode).sort()).toEqual([201, 400, 400, 400, 400]);
+        responses
+          .filter((res) => res.statusCode === 400)
+          .forEach((res) => expect(res.body).toEqual({ message: 'Email is already registered.' }));
+        expect(await User.countDocuments({ email: validUser.email })).toBe(1);
+        logLines.forEach((line) => expect(line).not.toContain(validUser.email));
+      });
     });
   });
 

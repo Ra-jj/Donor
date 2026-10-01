@@ -7,6 +7,7 @@ const { io, server } = require('../lib/socket');
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // Coordinates are [longitude, latitude]
 const HOSPITAL = [77.5946, 12.9716]; // Bangalore
@@ -57,6 +58,7 @@ const registerUser = async ({ bloodGroup, location = NEARBY, name }) => {
       password: 'password123',
       bloodGroup,
       location,
+      ...REGISTRATION_CONSENT,
     });
   expect(res.statusCode).toBe(201);
   const setCookie = res.headers['set-cookie'];

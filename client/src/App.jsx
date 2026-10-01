@@ -20,6 +20,9 @@ const RegisterPage = lazyPage(() => import('./pages/RegisterPage'));
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'));
 const CreateRequestPage = lazyPage(() => import('./pages/CreateRequestPage'));
 const ProfilePage = lazyPage(() => import('./pages/ProfilePage'));
+const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage'));
+// Not a route: shown in place of the routes while the user must agree to the current notice
+const PrivacyConsentPage = lazyPage(() => import('./pages/PrivacyConsentPage'));
 
 // Must match the <Route> paths below
 const PAGE_BY_PATH = {
@@ -29,6 +32,7 @@ const PAGE_BY_PATH = {
   '/dashboard': DashboardPage,
   '/create-request': CreateRequestPage,
   '/profile': ProfilePage,
+  '/privacy': PrivacyPage,
 };
 
 // Pages likely to be opened next, prefetched once the current page is in. Matters most for
@@ -43,12 +47,19 @@ const LIKELY_NEXT_PAGES = {
   '/profile': [DashboardPage, LoginPage],
 };
 
-// The page the routes below really show for a URL once auth is known. Must match their
-// redirects: '/', '/login' and '/register' send a logged-in user to /dashboard, and
-// ProtectedRoute sends a logged-out user to /login.
+// A signed-in user who has not agreed to the current Privacy Notice (the server decides, see
+// server/utils/privacyConsent.js) sees the consent screen instead of any page, on every URL but
+// /privacy, which must stay readable from that screen
+const isPrivacyConsentPending = (pathname, authUser) =>
+  Boolean(authUser?.needsPrivacyConsent) && pathname !== '/privacy';
+
+// The page really shown for a URL once auth is known. Must match the consent screen above and the
+// routes' redirects below: '/', '/login' and '/register' send a logged-in user to /dashboard, and
+// ProtectedRoute sends a logged-out user to /login. /privacy is shown to everyone.
 const PUBLIC_ONLY_PATHS = ['/', '/login', '/register'];
 const PROTECTED_PATHS = ['/dashboard', '/create-request', '/profile'];
 const pageShownFor = (pathname, authUser) => {
+  if (isPrivacyConsentPending(pathname, authUser)) return PrivacyConsentPage;
   if (authUser && PUBLIC_ONLY_PATHS.includes(pathname)) return DashboardPage;
   if (!authUser && PROTECTED_PATHS.includes(pathname)) return LoginPage;
   return PAGE_BY_PATH[pathname];
@@ -171,11 +182,25 @@ function App() {
     );
   }
 
+  // Checked on every render, not only on first load: a login can also bring a user who must agree.
+  // The routes are not rendered at all meanwhile, so no app page (nor its redirect) shows first.
+  if (isPrivacyConsentPending(location.pathname, authUser)) {
+    return (
+      <div className="min-h-screen bg-base-200 text-base-content font-sans">
+        <OfflineOverlay />
+        <PageTransition>
+          <PrivacyConsentPage />
+        </PageTransition>
+        <Toaster position="top-center" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-base-200 text-base-content font-sans">
       <OfflineOverlay />
       <Navbar />
-      
+
       <main className="flex-1 w-full pt-20">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
@@ -222,6 +247,12 @@ function App() {
                   <ProfilePage />
                 </PageTransition>
               </ProtectedRoute>
+            } />
+            {/* Public, signed in or not, and reachable while the consent screen is up */}
+            <Route path="/privacy" element={
+              <PageTransition className="container mx-auto px-4 py-8 max-w-3xl">
+                <PrivacyPage />
+              </PageTransition>
             } />
           </Routes>
         </AnimatePresence>

@@ -13,6 +13,7 @@
  * Everything here uses fixed offsets, never the server's local time zone (Render runs in UTC).
  */
 const Request = require('../models/request.model');
+const { describePrivacyConsent } = require('./privacyConsent');
 
 // Drugs and Cosmetics (Second Amendment) Rules, 2020, G.S.R. 166(E) of 11 March 2020,
 // Schedule F Part XII-B, "H. Criteria for Blood Donation", item 4 "Donation Interval": whole
@@ -121,14 +122,19 @@ const describeDonationGap = (nextEligibleDonationAt) =>
   `You donated recently. You can donate again from ${formatIndiaDate(nextEligibleDonationAt)}.`;
 
 /**
- * The user as the client receives it (no password), plus nextEligibleDonationAt
- * (an ISO instant, 00:00 IST of the first day they may donate, or null).
+ * The user as they receive their own profile (register, login, check, profile update, privacy
+ * consent): no password, plus nextEligibleDonationAt (an ISO instant, 00:00 IST of the first day
+ * they may donate, or null), plus privacyConsent and needsPrivacyConsent (utils/privacyConsent.js).
+ * Without privacyConsentHistory: it is kept as proof of consent, and no screen uses it.
+ * Only for the signed-in user themselves, never for another user.
  * @param {import('mongoose').Document} userDocument
  * @returns {Promise<object>}
  */
 const withDonationEligibility = async (userDocument) => {
   const user = userDocument.toObject();
   delete user.password;
+  delete user.privacyConsentHistory;
+  Object.assign(user, describePrivacyConsent(userDocument));
   user.nextEligibleDonationAt = await findNextEligibleDonationAt(userDocument._id, userDocument.lastOutsideDonationDate);
   return user;
 };

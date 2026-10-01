@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const app = require('../index');
 const Request = require('../models/request.model');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // supertest dials 127.0.0.1, so bind there explicitly. request(app) binds `::`, and another
 // local app on the same ephemeral port can answer instead.
@@ -57,6 +58,7 @@ describe('malformed ids in route params', () => {
       password: 'password123',
       bloodGroup: 'O-',
       location: [77.5946, 12.9716],
+      ...REGISTRATION_CONSENT,
     });
     expect(res.statusCode).toBe(201);
     cookie = res.headers['set-cookie'];

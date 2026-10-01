@@ -62,6 +62,11 @@ const Navbar = () => {
                       </Link>
                     </li>
                     <li className="p-1">
+                      <Link to="/privacy" className="hover:bg-base-200 flex gap-3 py-3 rounded-xl font-semibold text-base-content/80">
+                        Privacy
+                      </Link>
+                    </li>
+                    <li className="p-1">
                       <button onClick={logout} className="text-error hover:bg-error/10 hover:text-error flex gap-3 py-3 rounded-xl font-semibold">
                         <SignOutIcon weight="regular" className="w-5 h-5" />
                         Log out
@@ -93,6 +98,7 @@ const Navbar = () => {
               </>
             ) : (
               <div className="flex items-center gap-3">
+                <Link to="/privacy" className="font-semibold text-base-content/70 hover:text-primary transition-colors px-2">Privacy</Link>
                 <button
                   onClick={toggleTheme}
                   className="btn btn-ghost btn-circle text-base-content/70 hover:text-primary transition-colors"
@@ -173,6 +179,7 @@ const Navbar = () => {
                     <Link to="/dashboard" className="btn btn-ghost justify-start font-semibold text-lg">Dashboard</Link>
                     <Link to="/create-request" className="btn btn-ghost justify-start font-semibold text-lg">New Request</Link>
                     <Link to="/profile" className="btn btn-ghost justify-start font-semibold text-lg">Profile</Link>
+                    <Link to="/privacy" className="btn btn-ghost justify-start font-semibold text-lg">Privacy</Link>
                     <button
                       onClick={toggleTheme}
                       className="btn btn-ghost justify-start font-semibold text-lg gap-3 active:scale-95 transition-transform min-h-11"
@@ -193,6 +200,7 @@ const Navbar = () => {
                   <>
                     <Link to="/login" className="btn btn-ghost btn-lg justify-start font-semibold active:scale-95 transition-transform min-h-11">Log in</Link>
                     <Link to="/register" className="btn btn-primary btn-lg text-white font-bold rounded-xl mt-2 shadow-primary/20 shadow-lg active:scale-95 transition-transform min-h-11">Create Account</Link>
+                    <Link to="/privacy" className="btn btn-ghost justify-start font-semibold active:scale-95 transition-transform min-h-11">Privacy</Link>
                   </>
                 )}
               </div>

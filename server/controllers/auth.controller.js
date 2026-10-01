@@ -3,14 +3,26 @@ const User = require('../models/user.model');
 const generateTokenAndSetCookie = require('../utils/generateToken');
 const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
 const { withDonationEligibility } = require('../utils/donationGap');
+const { buildSignUpPrivacyConsentFields } = require('../utils/privacyConsent');
+
+const EMAIL_TAKEN_MESSAGE = 'Email is already registered.';
+
+// MongoDB's answer when a save hits the unique index on email. Its message and keyValue hold the
+// email address, so neither may be logged.
+const isDuplicateEmailError = (error) => error?.code === 11000 && Boolean(error.keyPattern?.email);
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, bloodGroup, location } = req.body;
+    const { name, email, password, bloodGroup, location, acceptPrivacy, confirmAdult } = req.body;
 
     // Basic validation
     if (!name || !email || !password || !bloodGroup || !location) {
       return res.status(400).json({ message: 'All fields are required.' });
+    }
+    // registerSchema already refuses anything but true; checked here too because the account
+    // below records these two agreements as given
+    if (acceptPrivacy !== true || confirmAdult !== true) {
+      return res.status(400).json({ message: 'Agree to the Privacy Notice and confirm you are 18 or older.' });
     }
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
@@ -19,7 +31,7 @@ exports.register = async (req, res) => {
     // Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'Email is already registered.' });
+      return res.status(400).json({ message: EMAIL_TAKEN_MESSAGE });
     }
 
     // Hash the password
@@ -36,9 +48,22 @@ exports.register = async (req, res) => {
         type: 'Point',
         coordinates: location, // Ensure frontend sends this as [lng, lat]
       },
+      // The current notice version and the server's time, never values from the request body,
+      // with the consent history's first entry
+      ...buildSignUpPrivacyConsentFields(),
     });
 
-    await newUser.save();
+    try {
+      await newUser.save();
+    } catch (error) {
+      // Another sign-up with the same email was saved after the check above (two at once), and
+      // the unique index refused this one: the same answer as the check, and no 500
+      if (isDuplicateEmailError(error)) {
+        console.warn(`register: save refused by the unique email index (error code ${error.code})`);
+        return res.status(400).json({ message: EMAIL_TAKEN_MESSAGE });
+      }
+      throw error;
+    }
 
     // No password; nextEligibleDonationAt as in every user response (null for a new account).
     // Built before the cookie is set, so a failure here does not leave a half-done sign-in.

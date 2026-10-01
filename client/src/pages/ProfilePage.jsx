@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
-import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon, WarningOctagonIcon, TrashIcon } from '@phosphor-icons/react';
+import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon, WarningOctagonIcon, TrashIcon, ShieldCheckIcon } from '@phosphor-icons/react';
+import { PRIVACY_CONTACT_EMAIL } from '../config/privacy';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
@@ -392,6 +394,31 @@ const ProfilePage = () => {
           </div>
         )}
       </div>
+
+      <section aria-labelledby="privacy-heading" className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-base-300">
+        <h2 id="privacy-heading" className="text-xl font-display font-bold mb-2 flex items-center gap-2">
+          <ShieldCheckIcon weight="duotone" className="w-6 h-6 text-primary shrink-0" aria-hidden="true" />
+          Privacy
+        </h2>
+        <div className="text-sm text-base-content/70 leading-relaxed mb-5 max-w-prose space-y-2">
+          {authUser?.privacyConsent && (
+            <p>
+              You agreed to the Privacy Notice (version {authUser.privacyConsent.version}) on{' '}
+              <span className="whitespace-nowrap">{formatIndiaDate(authUser.privacyConsent.acceptedAt)}</span>.
+            </p>
+          )}
+          <p>
+            For a copy of your data, or to correct it, email{' '}
+            <a href={`mailto:${PRIVACY_CONTACT_EMAIL}`} className="font-semibold text-primary underline wrap-anywhere">
+              {PRIVACY_CONTACT_EMAIL}
+            </a>
+            . Deleting your account below withdraws your consent.
+          </p>
+        </div>
+        <Link to="/privacy" className="btn btn-outline rounded-xl">
+          Read the Privacy Notice
+        </Link>
+      </section>
 
       <section aria-labelledby="delete-account-heading" className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-error/30">
         <h2 id="delete-account-heading" className="text-xl font-display font-bold mb-2 flex items-center gap-2 text-error">

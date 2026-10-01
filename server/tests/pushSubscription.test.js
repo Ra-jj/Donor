@@ -3,6 +3,7 @@ const request = require('supertest');
 const app = require('../index');
 const User = require('../models/user.model');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // supertest dials 127.0.0.1, so bind there explicitly. request(app) binds `::`, and another
 // local app on the same ephemeral port can answer instead.
@@ -44,6 +45,7 @@ describe('POST /api/push/subscribe validation', () => {
       password: 'password123',
       bloodGroup: 'O-',
       location: [88.3639, 22.5726],
+      ...REGISTRATION_CONSENT,
     });
     authCookie = res.headers['set-cookie'];
     userId = res.body.user._id;

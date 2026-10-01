@@ -2,6 +2,13 @@ const { z } = require('zod');
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+// The two sign-up checkboxes, each its own separate agreement. Only the boolean true passes: a
+// missing value, false, the string "true" or 1 is refused, so consent is always an explicit tick.
+const privacyConsentFields = {
+  acceptPrivacy: z.literal(true, { error: 'Agree to the Privacy Notice to continue' }),
+  confirmAdult: z.literal(true, { error: 'Confirm you are 18 or older to continue' }),
+};
+
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters long'),
   email: z.string().email('Invalid email format').regex(/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/, 'Please enter a valid email address (e.g. name@domain.com)'),
@@ -19,7 +26,12 @@ const registerSchema = z.object({
     .refine((val) => val[1] >= -90 && val[1] <= 90, {
       message: 'Invalid latitude',
     }),
+  ...privacyConsentFields,
 });
+
+// POST /api/users/privacy-consent: the same two agreements, from a signed-in user who has not yet
+// agreed to the current notice
+const privacyConsentSchema = z.object(privacyConsentFields);
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -35,4 +47,5 @@ module.exports = {
   registerSchema,
   loginSchema,
   deleteAccountSchema,
+  privacyConsentSchema,
 };

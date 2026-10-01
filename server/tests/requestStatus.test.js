@@ -6,6 +6,7 @@ const { io } = require('../lib/socket');
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { connectDB, closeDB, clearDB } = require('./db');
+const { REGISTRATION_CONSENT } = require('./registration');
 
 // supertest dials 127.0.0.1, so bind there explicitly. request(app) binds `::`, and another
 // local app on the same ephemeral port can answer instead.
@@ -51,6 +52,7 @@ const registerUser = async ({ bloodGroup, location = NEARBY, name }) => {
       password: 'password123',
       bloodGroup,
       location,
+      ...REGISTRATION_CONSENT,
     });
   expect(res.statusCode).toBe(201);
   return { id: res.body.user._id, name: res.body.user.name, cookie: res.headers['set-cookie'] };
