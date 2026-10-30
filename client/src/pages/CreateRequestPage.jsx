@@ -4,20 +4,18 @@ import { motion } from 'motion/react';
 import { BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
+import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
+import { URGENCY_LEVELS } from '../lib/urgencyLevels';
 import toast from 'react-hot-toast';
 import MapErrorBoundary from '../components/MapErrorBoundary';
 import HospitalLocationField, { HOSPITAL_SEARCH_INPUT_ID } from '../components/HospitalLocationField';
+import ShareRequestButtons from '../components/ShareRequestButtons';
 
 const DonorMap = lazy(loadDonorMap);
 const MISSING_LOCATION_ERROR =
   "Choose the hospital from the search results, or use your location if you're at the hospital.";
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const URGENCY_LEVELS = [
-  { value: 'low', label: 'Low (Within 48 hours)' },
-  { value: 'medium', label: 'Medium (Within 24 hours)' },
-  { value: 'high', label: 'High (Immediate/Emergency)' }
-];
 
 const CreateRequestPage = () => {
   const [loading, setLoading] = useState(false);
@@ -36,6 +34,47 @@ const CreateRequestPage = () => {
   // The pick preview and the success screen show the map: load it now, before a new build can
   // replace it (lib/loadDonorMap.js)
   useEffect(() => preloadDonorMapWhenIdle(), []);
+
+  // The success screen offers sharing only while the new request still has no donor, so follow
+  // its changes (a donor accepting it, or it reopening) while the screen is up
+  const createdRequestId = successData?.request?._id;
+  useEffect(() => {
+    const socket = getSocket();
+    if (!createdRequestId || !socket) return;
+
+    const setCreatedRequestStatus = (status) => {
+      setSuccessData((prev) => (prev ? { ...prev, request: { ...prev.request, status } } : prev));
+    };
+
+    const handleStatusUpdate = (data) => {
+      if (String(data.requestId) !== String(createdRequestId)) return;
+      setCreatedRequestStatus(data.status);
+    };
+
+    // Events sent while the socket was down are not replayed, so a reconnect reads the request's
+    // status from the server instead. Same rule as the dashboard (pages/DashboardPage.jsx): every
+    // connect after this socket's first, or a first connect that followed failed attempts.
+    let hasConnectedBefore = hasSocketConnectedBefore(socket);
+    const handleConnect = () => {
+      const shouldRefetch = hasConnectedBefore || hadFailedAttempt(socket);
+      hasConnectedBefore = true;
+      if (!shouldRefetch) return;
+      axiosInstance.get('/requests/mine')
+        .then((res) => {
+          const latest = res.data.requests.find((req) => String(req._id) === String(createdRequestId));
+          if (latest) setCreatedRequestStatus(latest.status);
+        })
+        // The screen keeps what it shows; the next event or reconnect can still update it
+        .catch((error) => console.error('Refreshing the request after a reconnect failed:', error));
+    };
+
+    socket.on('requestStatusUpdate', handleStatusUpdate);
+    socket.on('connect', handleConnect);
+    return () => {
+      socket.off('requestStatusUpdate', handleStatusUpdate);
+      socket.off('connect', handleConnect);
+    };
+  }, [createdRequestId]);
 
   const handleHospitalLocationChange = (location) => {
     setHospitalLocation(location);
@@ -94,18 +133,18 @@ const CreateRequestPage = () => {
 
   if (successData) {
     return (
-      <div className="flex justify-center items-center py-12 px-4">
+      <div className="flex justify-center items-center py-12 px-2 sm:px-4">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="card w-full max-w-3xl bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden"
         >
-          <div className="card-body p-6 sm:p-10">
+          <div className="card-body p-4 sm:p-10">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-4 border border-success/20">
                 <HeartbeatIcon weight="fill" className="w-8 h-8" />
               </div>
-              <h2 className="text-3xl font-display font-bold text-base-content">Request Broadcasted</h2>
+              <h2 className="text-2xl sm:text-3xl font-display font-bold text-base-content hyphens-auto">Request Broadcasted</h2>
               <p className="text-base-content/70 mt-2">
                 We've found <strong>{successData.matchedDonorCount ?? 0}</strong> compatible donors near {successData.sentHospitalName}.
               </p>
@@ -130,10 +169,27 @@ const CreateRequestPage = () => {
               </MapErrorBoundary>
             </div>
 
+            {/* Announced if it changes while open, e.g. when a donor accepts */}
+            <div aria-live="polite">
+              {successData.request?.status === 'pending' && (
+                <section aria-labelledby="share-request-heading" className="mt-8 text-center">
+                  <h3 id="share-request-heading" className="text-lg font-display font-bold text-base-content mb-3">
+                    Share with people not on Donor
+                  </h3>
+                  <ShareRequestButtons request={successData.request} />
+                </section>
+              )}
+              {successData.request?.status === 'accepted' && (
+                <p className="mt-8 bg-success/10 border border-success/20 rounded-2xl p-4 text-sm font-medium text-base-content text-center">
+                  A donor accepted your request. Go to your dashboard to chat with them.
+                </p>
+              )}
+            </div>
+
             <div className="mt-8">
-              <Link to="/dashboard" className="btn btn-primary w-full h-14 rounded-xl text-lg text-white font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform">
+              <Link to="/dashboard" className="btn btn-primary w-full min-h-14 h-auto py-2 rounded-xl text-lg text-white font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform">
                 Go to Dashboard
-                <ArrowRightIcon weight="bold" className="w-5 h-5 ml-1" />
+                <ArrowRightIcon weight="bold" className="w-5 h-5 ml-1 shrink-0" />
               </Link>
             </div>
           </div>

@@ -131,7 +131,7 @@ const sendNewRequestAlerts = (donorsToNotify, requestForDonors) => {
       if (donor.pushSubscription && !pushEndpointProblem) {
         const payload = JSON.stringify({
           title: '🚨 Emergency Blood Request!',
-          body: `${requesterName} needs ${unitsNeeded} units of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
+          body: `${requesterName} needs ${unitsNeeded} ${unitsNeeded === 1 ? 'unit' : 'units'} of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
           icon: '/pwa-192x192.png',
           data: { url: '/dashboard' }
         });

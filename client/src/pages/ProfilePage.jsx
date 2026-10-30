@@ -376,7 +376,7 @@ const ProfilePage = () => {
                   {history.pastRequests.map(req => (
                     <div key={req._id} className="bg-base-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                       <div>
-                        <div className="font-bold">{req.unitsNeeded} units of {req.bloodGroup}</div>
+                        <div className="font-bold">{req.unitsNeeded} {req.unitsNeeded === 1 ? 'unit' : 'units'} of {req.bloodGroup}</div>
                         <div className="text-sm text-base-content/60">
                           {/* matchedDonorId is null once the donor has deleted their account */}
                           {req.status === 'fulfilled' && <>Donated by {req.matchedDonorId?.name || 'Deleted user'} • </>}
