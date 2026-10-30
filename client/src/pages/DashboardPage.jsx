@@ -10,6 +10,7 @@ import ChatWindow from '../components/ChatWindow';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
 import MapErrorBoundary from '../components/MapErrorBoundary';
+import ShareRequestButtons from '../components/ShareRequestButtons';
 import { isInDonationGap, formatIndiaDate } from '../lib/donationGap';
 import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
@@ -204,7 +205,7 @@ const DashboardPage = () => {
         <div>
           <strong className="font-display text-lg tracking-tight">Emergency Request!</strong>
           <br/>
-          {newRequestData.unitsNeeded} units of {newRequestData.bloodGroup} needed at {newRequestData.hospitalName}.
+          {newRequestData.unitsNeeded} {newRequestData.unitsNeeded === 1 ? 'unit' : 'units'} of {newRequestData.bloodGroup} needed at {newRequestData.hospitalName}.
         </div>, 
         { duration: 6000, icon: '🚨' }
       );
@@ -582,7 +583,7 @@ const DashboardPage = () => {
                                 </div>
                               </div>
                               <p className="text-sm text-base-content/70">
-                                Needs: <strong>{req.unitsNeeded} units</strong> of {req.bloodGroup}
+                                Needs: <strong>{req.unitsNeeded} {req.unitsNeeded === 1 ? 'unit' : 'units'}</strong> of {req.bloodGroup}
                               </p>
                               
                               <div className="card-actions justify-end mt-4">
@@ -663,8 +664,15 @@ const DashboardPage = () => {
                             </div>
                           </div>
                           <p className="text-sm text-base-content/70 mt-2">
-                            {req.unitsNeeded} units • {req.bloodGroup}
+                            {req.unitsNeeded} {req.unitsNeeded === 1 ? 'unit' : 'units'} • {req.bloodGroup}
                           </p>
+
+                          {/* Still without a donor, so the requester can ask people outside the app too */}
+                          {req.status === 'pending' && (
+                            <div className="mt-4">
+                              <ShareRequestButtons request={req} />
+                            </div>
+                          )}
 
                           {/* Accepted state: show chat prompt + fulfill button */}
                           {req.status === 'accepted' && (
