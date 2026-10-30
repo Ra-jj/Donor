@@ -16,6 +16,7 @@ import {
   getTodayInIndiaDateString,
   toDateInputValue,
 } from '../lib/donationGap';
+import { isExpiredRequest } from '../lib/requestExpiry';
 
 // Re-reads when this donor may donate again, e.g. after a donation is marked fulfilled while this
 // page is open. Not checkAuth: a failed checkAuth sets authUser to null, and ProtectedRoute would
@@ -384,7 +385,7 @@ const ProfilePage = () => {
                         </div>
                       </div>
                       <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>
-                        {req.status}
+                        {isExpiredRequest(req) ? 'expired' : req.status}
                       </div>
                     </div>
                   ))}

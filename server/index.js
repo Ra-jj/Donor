@@ -28,6 +28,7 @@ const pushRoutes = require('./routes/push.route');
 const userRoutes = require('./routes/user.route');
 const { createSecurityHeaders } = require('./middleware/securityHeaders');
 const { parseTrustProxy } = require('./utils/parseTrustProxy');
+const { startRequestExpirySweeps } = require('./utils/requestExpiry');
 const { app, server } = require('./lib/socket');
 
 const PORT = process.env.PORT || 8000;
@@ -108,6 +109,10 @@ if (require.main === module) {
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+    // Closes the requests that ran out while the server was asleep, then keeps closing them while
+    // it is awake. Not awaited: it logs its own failures, and a request read in the meantime
+    // already treats an expired request as closed.
+    startRequestExpirySweeps();
   };
   startServer();
 }
