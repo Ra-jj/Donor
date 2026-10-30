@@ -7,6 +7,7 @@ const { io } = require('../lib/socket');
 const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
 const { withDonationEligibility } = require('../utils/donationGap');
 const { buildPrivacyConsentUpdate, privacyConsentMissingFilter } = require('../utils/privacyConsent');
+const { hasExpired, expireStaleRequests, expireRequesterStaleRequests } = require('../utils/requestExpiry');
 const { notifyNearbyDonors } = require('./request.controller');
 
 exports.getStats = async (req, res) => {
@@ -125,6 +126,9 @@ exports.getHistory = async (req, res) => {
   try {
     const userId = req.user._id;
 
+    // As in getMyRequests: a request of theirs that ran out is shown as expired, not as open
+    await expireRequesterStaleRequests(userId);
+
     // Fetch past requests made by the user
     const pastRequests = await Request.find({ requesterId: userId })
       .populate('matchedDonorId', 'name')
@@ -171,7 +175,7 @@ const eraseUserData = async (userId, session) => {
     .session(session)
     .lean();
   const donatedRequests = await Request.find({ matchedDonorId: userId })
-    .select('_id status requesterId')
+    .select('_id status requesterId createdAt')
     .session(session)
     .lean();
   const removedRequests = createdRequests.filter((request) => request.status !== 'fulfilled');
@@ -218,10 +222,11 @@ const eraseUserData = async (userId, session) => {
     donorsOfCancelledRequests: removedRequests
       .filter((request) => request.status === 'accepted' && request.matchedDonorId)
       .map((request) => ({ requestId: request._id, donorId: request.matchedDonorId })),
-    // The requester of a request this user had accepted, which is pending again
+    // The requester of a request this user had accepted, which is pending again. createdAt is
+    // what its open hours count from (utils/requestExpiry.js).
     requestersOfReopenedRequests: donatedRequests
       .filter((request) => request.status === 'accepted' && request.requesterId)
-      .map((request) => ({ requestId: request._id, requesterId: request.requesterId })),
+      .map((request) => ({ requestId: request._id, requesterId: request.requesterId, createdAt: request.createdAt })),
   };
 };
 
@@ -295,8 +300,11 @@ const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, re
     }
   });
 
-  requestersOfReopenedRequests.forEach(({ requestId, requesterId }) => {
+  requestersOfReopenedRequests.forEach(({ requestId, requesterId, createdAt }) => {
     try {
+      // Already past its open hours: announceReopenedRequests closes it instead, which sends its
+      // requester the expiry event. "Open to donors again" right before it would contradict it.
+      if (hasExpired({ status: 'pending', createdAt })) return;
       // The event an accept sends (acceptRequest), with the new status
       io.to(String(requesterId)).emit('requestStatusUpdate', {
         requestId,
@@ -323,10 +331,16 @@ const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, re
 // created, and donors who were busy or resting then were left out, so it is announced again the
 // same way. Each request is re-read first: another donor may have accepted it since, or its
 // requester cancelled it. Runs after the response, like createRequest's alerts, and only logs.
+// Its open hours still count from when it was created (utils/requestExpiry.js), so one that is
+// already past them is closed now, which tells its requester, and no donor is alerted about it.
 const announceReopenedRequests = async (requestersOfReopenedRequests) => {
   for (const { requestId } of requestersOfReopenedRequests) {
     try {
       const reopenedRequest = await Request.findOne({ _id: requestId, status: 'pending' });
+      if (reopenedRequest && hasExpired(reopenedRequest)) {
+        await expireStaleRequests({ scope: { _id: reopenedRequest._id } });
+        continue;
+      }
       const requester = reopenedRequest
         ? await User.findById(reopenedRequest.requesterId).select('name').lean()
         : null;

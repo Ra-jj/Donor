@@ -21,6 +21,13 @@ const {
   findNextEligibleDonationAt,
   describeDonationGap,
 } = require('../utils/donationGap');
+const {
+  stillOpenFilter,
+  hasExpired,
+  expireStaleRequestsLogged,
+  expireRequesterStaleRequests,
+  expireStaleRequestsIfDue,
+} = require('../utils/requestExpiry');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -239,6 +246,9 @@ exports.createRequest = async (req, res) => {
 
 exports.getMyRequests = async (req, res) => {
   try {
+    // A request of theirs that ran out while the server slept is closed (and announced) first,
+    // so the list never shows it as still open
+    await expireRequesterStaleRequests(req.user._id);
     const requests = await Request.find({ requesterId: req.user._id }).sort({ createdAt: -1 });
     res.status(200).json({ requests });
   } catch (error) {
@@ -255,11 +265,18 @@ exports.getIncomingRequests = async (req, res) => {
     // Get all recipient groups this donor is medically allowed to donate to
     const compatibleRecipientGroups = getCompatibleRecipientGroups(donor.bloodGroup);
 
+    // Tells requesters whose requests ran out. Throttled, and not awaited: this list does not need
+    // it (the filter below leaves out an expired request whether or not a sweep has marked it
+    // yet), and a sweep over a backlog would hold the list up for as long as it runs. It never
+    // rejects: it logs its own failures.
+    expireStaleRequestsIfDue();
+
     // Find pending requests nearby matching compatible blood groups, OR requests this donor has already accepted
     const rawIncomingRequests = await Request.find({
       $or: [
         {
           status: 'pending',
+          ...stillOpenFilter(),
           bloodGroup: { $in: compatibleRecipientGroups },
           requesterId: { $ne: donor._id },
           declinedBy: { $ne: donor._id },
@@ -320,6 +337,10 @@ const withinDonorRadius = (donor) => ({
 const rejectInsideDonationGap = (res, nextEligibleDonationAt) =>
   res.status(403).json({ message: describeDonationGap(nextEligibleDonationAt), nextEligibleDonationAt });
 
+// 409 like the other answers about a request that changed since the donor's list loaded, so the
+// dashboard reloads it and the card goes
+const rejectExpiredRequest = (res) => res.status(409).json({ message: 'This request has expired' });
+
 // Puts back to pending an accept that must not stand. The filter matches only while it is still
 // this donor's accept, so it never overwrites what happened to the request since.
 const undoAccept = async (request, donor, reason) => {
@@ -351,12 +372,15 @@ const acceptRequest = async (req, res) => {
   // written: holding this accepted request is what makes them busy (see createRequest).
   // Every rule about the request itself lives in the filter, so if two donors accept at the
   // same moment only the first can still match status: 'pending' and the other matches nothing.
+  // The same holds against the expiry sweep, which also writes only while status is 'pending':
+  // whichever write lands first wins, and createdAt keeps an accept out once the hours are up.
   let request;
   try {
     request = await Request.findOneAndUpdate(
       {
         _id: requestId,
         status: 'pending',
+        ...stillOpenFilter(),
         requesterId: { $ne: donor._id },
         bloodGroup: { $in: getCompatibleRecipientGroups(donor.bloodGroup) },
         hospitalLocation: withinDonorRadius(donor),
@@ -398,7 +422,11 @@ const acceptRequest = async (req, res) => {
       });
     }
 
-    // The donor is eligible, so the request was no longer pending
+    // The donor is eligible, so the request was no longer open: past its hours (whether or not a
+    // sweep has closed it yet), or no longer pending
+    if (hasExpired(existing)) {
+      return rejectExpiredRequest(res);
+    }
     const isAlreadyMatchedToDonor =
       existing.matchedDonorId && existing.matchedDonorId.toString() === donor._id.toString();
     if (existing.status === 'accepted' && isAlreadyMatchedToDonor) {
@@ -467,8 +495,10 @@ const declineRequest = async (req, res) => {
   // $addToSet (not push) so declining twice does not duplicate the id.
   // Check matchedCount, not modifiedCount: a repeat decline must return 200 whatever
   // modifiedCount says (with timestamps: true it is 1 anyway, since updatedAt changes).
+  // An expired request is refused like accept refuses it (409), not declined: it is closed, so a
+  // decline would record nothing useful, and the 409 makes the dashboard reload and drop the card.
   const result = await Request.updateOne(
-    { _id: requestId, status: 'pending', requesterId: { $ne: userId } },
+    { _id: requestId, status: 'pending', ...stillOpenFilter(), requesterId: { $ne: userId } },
     { $addToSet: { declinedBy: userId } }
   );
 
@@ -479,6 +509,9 @@ const declineRequest = async (req, res) => {
     }
     if (String(existing.requesterId) === String(userId)) {
       return res.status(403).json({ message: 'You cannot decline your own request' });
+    }
+    if (hasExpired(existing)) {
+      return rejectExpiredRequest(res);
     }
     return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
   }
@@ -503,12 +536,13 @@ const cancelRequest = async (req, res) => {
 
   // Only the requester can cancel, and only while the request is still open. One atomic
   // write: leaving 'accepted' is what frees the donor, and their own isAvailable choice
-  // is left exactly as they set it.
+  // is left exactly as they set it. A pending request past its open hours is not open any more,
+  // even before a sweep has closed it, so it is not cancelled here (see below).
   const request = await Request.findOneAndUpdate(
     {
       _id: requestId,
       requesterId: requester._id,
-      status: { $in: ['pending', 'accepted'] },
+      $or: [{ status: 'accepted' }, { status: 'pending', ...stillOpenFilter() }],
     },
     { $set: { status: 'cancelled' } },
     { returnDocument: 'after' }
@@ -521,6 +555,15 @@ const cancelRequest = async (req, res) => {
     }
     if (String(existing.requesterId) !== String(requester._id)) {
       return res.status(403).json({ message: 'Only the requester can cancel this request' });
+    }
+    if (hasExpired(existing)) {
+      // Past its hours but not swept yet: closed as expired now, which sends the requester the
+      // same event a sweep would. Logged, never thrown: the answer is 409 either way, since an
+      // expired request is closed for every read and write whether or not it has been marked.
+      if (existing.status === 'pending') {
+        await expireStaleRequestsLogged({ scope: { _id: existing._id } });
+      }
+      return rejectExpiredRequest(res);
     }
     return res.status(409).json({ message: `This request has already been ${existing.status}` });
   }

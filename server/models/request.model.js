@@ -60,6 +60,12 @@ const requestSchema = new mongoose.Schema(
       enum: ['pending', 'accepted', 'fulfilled', 'cancelled'],
       default: 'pending',
     },
+    // Set only on a request the server cancelled itself: 'expired' when it was still pending
+    // REQUEST_OPEN_HOURS after it was created (utils/requestExpiry.js). Absent on every other one.
+    closedReason: {
+      type: String,
+      enum: ['expired'],
+    },
     // Also null on a fulfilled or cancelled request whose donor deleted their account
     matchedDonorId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -108,5 +114,9 @@ requestSchema.index({ matchedDonorId: 1, status: 1, fulfilledAt: -1 });
 
 // Serves createRequest's distinct busy-or-resting donor query: an index scan per $or branch instead of a collection scan
 requestSchema.index({ status: 1, fulfilledAt: 1, matchedDonorId: 1 });
+
+// Serves the expiry sweep (utils/requestExpiry.js): pending requests created before a cutoff, a
+// range that is empty or nearly so between sweeps
+requestSchema.index({ status: 1, createdAt: 1 });
 
 module.exports = mongoose.model('Request', requestSchema);

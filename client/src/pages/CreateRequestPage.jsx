@@ -10,6 +10,9 @@ import toast from 'react-hot-toast';
 import MapErrorBoundary from '../components/MapErrorBoundary';
 import HospitalLocationField, { HOSPITAL_SEARCH_INPUT_ID } from '../components/HospitalLocationField';
 import ShareRequestButtons from '../components/ShareRequestButtons';
+import { isExpiredRequest, describeExpiredRequest } from '../lib/requestExpiry';
+import { markExpiredRequestSeen } from '../lib/expiredRequestPopups';
+import { useAuthStore } from '../store/useAuthStore';
 
 const DonorMap = lazy(loadDonorMap);
 const MISSING_LOCATION_ERROR =
@@ -36,19 +39,22 @@ const CreateRequestPage = () => {
   useEffect(() => preloadDonorMapWhenIdle(), []);
 
   // The success screen offers sharing only while the new request still has no donor, so follow
-  // its changes (a donor accepting it, or it reopening) while the screen is up
+  // its changes (a donor accepting it, it reopening, or it closing after its open hours) while the
+  // screen is up
   const createdRequestId = successData?.request?._id;
   useEffect(() => {
     const socket = getSocket();
     if (!createdRequestId || !socket) return;
 
-    const setCreatedRequestStatus = (status) => {
-      setSuccessData((prev) => (prev ? { ...prev, request: { ...prev.request, status } } : prev));
+    // closedReason is 'expired' only on a request the server closed after its open hours
+    const setCreatedRequestStatus = (status, closedReason) => {
+      if (closedReason === 'expired') markExpiredRequestSeen(useAuthStore.getState().authUser?._id, createdRequestId);
+      setSuccessData((prev) => (prev ? { ...prev, request: { ...prev.request, status, closedReason } } : prev));
     };
 
     const handleStatusUpdate = (data) => {
       if (String(data.requestId) !== String(createdRequestId)) return;
-      setCreatedRequestStatus(data.status);
+      setCreatedRequestStatus(data.status, data.status === 'cancelled' && data.reason === 'expired' ? 'expired' : undefined);
     };
 
     // Events sent while the socket was down are not replayed, so a reconnect reads the request's
@@ -62,7 +68,7 @@ const CreateRequestPage = () => {
       axiosInstance.get('/requests/mine')
         .then((res) => {
           const latest = res.data.requests.find((req) => String(req._id) === String(createdRequestId));
-          if (latest) setCreatedRequestStatus(latest.status);
+          if (latest) setCreatedRequestStatus(latest.status, latest.closedReason);
         })
         // The screen keeps what it shows; the next event or reconnect can still update it
         .catch((error) => console.error('Refreshing the request after a reconnect failed:', error));
@@ -183,6 +189,19 @@ const CreateRequestPage = () => {
                 <p className="mt-8 bg-success/10 border border-success/20 rounded-2xl p-4 text-sm font-medium text-base-content text-center">
                   A donor accepted your request. Go to your dashboard to chat with them.
                 </p>
+              )}
+              {/* Back to the form, still filled in with this request's details, to send a new one */}
+              {isExpiredRequest(successData.request) && (
+                <div className="mt-8 bg-base-200 border border-base-300 rounded-2xl p-4 text-sm font-medium text-base-content text-center space-y-3">
+                  <p className="wrap-anywhere">{describeExpiredRequest(successData.request.hospitalName)}</p>
+                  <button
+                    type="button"
+                    onClick={() => setSuccessData(null)}
+                    className="btn btn-sm btn-outline btn-primary rounded-xl font-bold"
+                  >
+                    Ask again
+                  </button>
+                </div>
               )}
             </div>
 

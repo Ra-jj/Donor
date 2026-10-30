@@ -12,9 +12,35 @@ import StarRating from '../components/StarRating';
 import MapErrorBoundary from '../components/MapErrorBoundary';
 import ShareRequestButtons from '../components/ShareRequestButtons';
 import { isInDonationGap, formatIndiaDate } from '../lib/donationGap';
+import {
+  getClosesAtMs,
+  hasRunOut,
+  isExpiredRequest,
+  describeTimeLeft,
+  EXPIRED_NOTE,
+} from '../lib/requestExpiry';
+import { announceExpiredRequest, announceMissedExpiredRequests } from '../lib/expiredRequestPopups';
 import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
 const DonorMap = lazy(loadDonorMap);
+
+const MINUTE_MS = 60 * 1000;
+// setTimeout fires at once for any longer delay
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+
+/** "Open for 31 more hours" on a requester's own pending request, kept current while it is shown */
+const OpenTimeLeft = ({ createdAt }) => {
+  const [nowMs, setNowMs] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), MINUTE_MS);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <p className="text-xs text-base-content/60 font-medium mt-1">
+      {describeTimeLeft(getClosesAtMs(createdAt), nowMs)}
+    </p>
+  );
+};
 
 /** Swipeable request card for mobile — drag right to accept, left to decline */
 const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, canAccept, children }) => {
@@ -154,6 +180,9 @@ const DashboardPage = () => {
   ])
     .then(([mineRes, incomingRes, statsRes]) => {
       setMyRequests(mineRes.data.requests);
+      // A request of theirs that closed after its open hours while they were away (the update over
+      // the socket only reaches a page that is open) gets its popup now, once per device
+      announceMissedExpiredRequests(useAuthStore.getState().authUser?._id, mineRes.data.requests);
       setIncomingRequests(incomingRes.data.incomingRequests);
       setHasActiveDonation(Boolean(incomingRes.data.hasActiveDonation));
       // Through getState, a module-level reference, so this function (used by the effects
@@ -233,6 +262,9 @@ const DashboardPage = () => {
     if (!socket) return;
 
     const handleStatusUpdate = (data) => {
+      // Closed by the server: still pending when its open hours ran out. Only its requester is told.
+      const hasExpired = data.status === 'cancelled' && data.reason === 'expired';
+
       // A late 'accepted' for a request that has already ended here must not revive it
       if (data.status === 'accepted') {
         const localRequest = myRequestsRef.current.find((req) => req._id === data.requestId);
@@ -247,6 +279,15 @@ const DashboardPage = () => {
         toast.success('Request has been marked as fulfilled! Thank you for donating. 🩸', { duration: 5000 });
       } else if (data.status === 'rated') {
         toast.success(`You received a ${data.rating}★ rating! ${data.ratingNote ? '"' + data.ratingNote + '"' : ''}`, { icon: '⭐', duration: 5000 });
+      } else if (hasExpired) {
+        const localRequest = myRequestsRef.current.find((req) => req._id === data.requestId);
+        // One popup per request, however the update reaches this page, and recorded as shown so
+        // the next load of the dashboard does not show it again
+        announceExpiredRequest(
+          useAuthStore.getState().authUser?._id,
+          data.requestId,
+          data.hospitalName || localRequest?.hospitalName
+        );
       } else if (data.status === 'cancelled' && data.reason === 'account_deleted') {
         // The server sends no name for a deleted account
         toast.error('The requester deleted their account. This request is cancelled.', { duration: 6000 });
@@ -257,9 +298,16 @@ const DashboardPage = () => {
         toast.error('Your donor deleted their account. Your request is open to donors again.', { duration: 6000 });
       }
       
-      // Update my requests list to reflect the new status. Back to pending means no donor.
+      // Update my requests list to reflect the new status. Back to pending, or expired, means no donor.
       setMyRequests((prev) => prev.map(req => 
-        req._id === data.requestId ? { ...req, status: data.status, matchedDonorId: data.status === 'pending' ? null : 'temp_id' } : req
+        req._id === data.requestId
+          ? {
+            ...req,
+            status: data.status,
+            matchedDonorId: data.status === 'pending' || hasExpired ? null : 'temp_id',
+            closedReason: hasExpired ? 'expired' : req.closedReason,
+          }
+          : req
       ));
 
       // Update incoming requests for the donor side. A cancelled request is gone for the
@@ -271,8 +319,9 @@ const DashboardPage = () => {
         )));
 
       // Cancel and fulfil events only reach the matched donor, and a donor holds at most one
-      // accepted request, so either one means this donor is no longer busy
-      if (data.status === 'cancelled' || data.status === 'fulfilled') {
+      // accepted request, so either one means this donor is no longer busy. An expiry goes to the
+      // requester instead, and says nothing about their own donations.
+      if ((data.status === 'cancelled' && !hasExpired) || data.status === 'fulfilled') {
         setHasActiveDonation(false);
       }
 
@@ -311,6 +360,52 @@ const DashboardPage = () => {
       socket.off('requestStatusUpdate', handleStatusUpdate);
       socket.off('connect', handleConnect);
     };
+  }, []);
+
+  // A pending request closes REQUEST_OPEN_HOURS after it was created, and the server may be asleep
+  // at that moment. So when the next one runs out on this screen: a donor's card for it goes, the
+  // way a cancelled one does, and a requester's own request is read again, which makes the server
+  // close it and send the usual update (with its popup). Runs again after every change to either
+  // set of requests.
+  useEffect(() => {
+    const scheduledAtMs = Date.now();
+    const pendingCloseTimes = (requests) =>
+      requests.filter((req) => req.status === 'pending').map((req) => getClosesAtMs(req.createdAt));
+    // A donor's card already past its time goes at once. A requester's request already past it
+    // is not read again here: the server keeps it open until its own clock says so.
+    const nextCloseAtMs = Math.min(
+      ...pendingCloseTimes(incomingRequests),
+      ...pendingCloseTimes(myRequests).filter((closesAtMs) => closesAtMs > scheduledAtMs)
+    );
+    if (!Number.isFinite(nextCloseAtMs)) return undefined;
+
+    const timer = setTimeout(() => {
+      const firedAtMs = Date.now();
+      // Always a new array, so this effect runs again and waits for the next one
+      setIncomingRequests((prev) => prev.filter((req) => !hasRunOut(req, firedAtMs)));
+      const ownRequestRanOut = myRequestsRef.current.some((req) => {
+        if (req.status !== 'pending') return false;
+        const closesAtMs = getClosesAtMs(req.createdAt);
+        return closesAtMs > scheduledAtMs && closesAtMs <= firedAtMs;
+      });
+      if (ownRequestRanOut) fetchDashboardData({ silent: true });
+    }, Math.min(Math.max(nextCloseAtMs - scheduledAtMs, 0), MAX_TIMER_DELAY_MS));
+    return () => clearTimeout(timer);
+  }, [incomingRequests, myRequests]);
+
+  // A device that slept can run the timer above long after the moment it was set for, so a donor's
+  // requests whose hours ran out also go as soon as the page is shown again. The same array when
+  // none has, so the timer above is not set up again for nothing.
+  useEffect(() => {
+    const dropRunOutIncoming = () => {
+      if (document.visibilityState !== 'visible') return;
+      const nowMs = Date.now();
+      setIncomingRequests((prev) =>
+        prev.some((req) => hasRunOut(req, nowMs)) ? prev.filter((req) => !hasRunOut(req, nowMs)) : prev
+      );
+    };
+    document.addEventListener('visibilitychange', dropRunOutIncoming);
+    return () => document.removeEventListener('visibilitychange', dropRunOutIncoming);
   }, []);
 
   const handleUpdateStatus = async (requestId, newStatus) => {
@@ -660,12 +755,26 @@ const DashboardPage = () => {
                               req.status === 'accepted' ? 'badge-success text-white' : 
                               req.status === 'fulfilled' ? 'badge-info text-white' : ''
                             }`}>
-                              {req.status.toUpperCase()}
+                              {isExpiredRequest(req) ? 'EXPIRED' : req.status.toUpperCase()}
                             </div>
                           </div>
                           <p className="text-sm text-base-content/70 mt-2">
                             {req.unitsNeeded} {req.unitsNeeded === 1 ? 'unit' : 'units'} • {req.bloodGroup}
                           </p>
+                          {req.status === 'pending' && <OpenTimeLeft createdAt={req.createdAt} />}
+
+                          {/* Closed after its open hours with no donor. Asking again starts a new request. */}
+                          {isExpiredRequest(req) && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm text-base-content/70">{EXPIRED_NOTE}</p>
+                              <Link
+                                to="/create-request"
+                                className="btn btn-sm btn-outline btn-primary rounded-xl font-bold"
+                              >
+                                Ask again
+                              </Link>
+                            </div>
+                          )}
 
                           {/* Still without a donor, so the requester can ask people outside the app too */}
                           {req.status === 'pending' && (
