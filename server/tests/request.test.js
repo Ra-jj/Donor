@@ -1,7 +1,10 @@
+const fs = require('fs');
 const http = require('http');
+const path = require('path');
 const request = require('supertest');
 const app = require('../index');
 const Request = require('../models/request.model');
+const { MAX_HOSPITAL_NAME_LENGTH } = require('../validators/requestValidator');
 const { connectDB, closeDB, clearDB } = require('./db');
 const { REGISTRATION_CONSENT } = require('./registration');
 
@@ -230,6 +233,91 @@ describe('POST /api/requests hospitalLocation', () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.body.errors.hospitalLocation).toMatch(/^Invalid input: expected number, received -?Infinity$/);
+    expect(await Request.countDocuments()).toBe(0);
+  });
+});
+
+// The hospital name is shown to donors on their cards, in push alerts and in shared messages, so
+// it has a length limit. It is counted after surrounding spaces are trimmed.
+describe('POST /api/requests hospitalName', () => {
+  let authCookie;
+
+  // The cookie sign-up sets, as in the hospitalLocation tests above
+  beforeEach(async () => {
+    const res = await request(server).post('/api/auth/register').send({
+      name: 'Name Requester',
+      email: 'name.requester@example.com',
+      password: 'password123',
+      bloodGroup: 'B+',
+      location: [77.5946, 12.9716], // Bangalore
+      ...REGISTRATION_CONSENT,
+    });
+    expect(res.statusCode).toBe(201);
+    authCookie = res.headers['set-cookie'];
+  });
+
+  const validRequest = {
+    bloodGroup: 'B+',
+    unitsNeeded: 2,
+    hospitalName: 'Test Hospital',
+    hospitalLocation: [77.5946, 12.9716],
+    urgency: 'high',
+  };
+  const TOO_LONG = `Hospital name cannot be longer than ${MAX_HOSPITAL_NAME_LENGTH} characters`;
+  const TOO_SHORT = 'Hospital name must be at least 2 characters long';
+
+  it('allows 150 characters, and the client allows the same number', () => {
+    expect(MAX_HOSPITAL_NAME_LENGTH).toBe(150);
+    const clientLibPath = path.join(__dirname, '../../client/src/lib/hospitalName.js');
+    const match = fs.readFileSync(clientLibPath, 'utf8').match(/export const MAX_HOSPITAL_NAME_LENGTH = (\d+);/);
+
+    expect(match).not.toBeNull();
+    expect(Number(match[1])).toBe(MAX_HOSPITAL_NAME_LENGTH);
+  });
+
+  it('accepts a name of exactly the maximum length, with no spaces in it, and stores all of it', async () => {
+    const hospitalName = 'H'.repeat(MAX_HOSPITAL_NAME_LENGTH);
+    const res = await request(server).post('/api/requests').set('Cookie', authCookie).send({ ...validRequest, hospitalName });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body.request.hospitalName).toBe(hospitalName);
+    const stored = await Request.findById(res.body.request._id).lean();
+    expect(stored.hospitalName).toBe(hospitalName);
+  });
+
+  it('counts the length after trimming, so spaces around a name of the maximum length are not refused', async () => {
+    const hospitalName = 'H'.repeat(MAX_HOSPITAL_NAME_LENGTH);
+    const res = await request(server)
+      .post('/api/requests')
+      .set('Cookie', authCookie)
+      .send({ ...validRequest, hospitalName: `  ${hospitalName}\n ` });
+
+    expect(res.statusCode).toBe(201);
+    const stored = await Request.findById(res.body.request._id).lean();
+    expect(stored.hospitalName).toBe(hospitalName);
+  });
+
+  it('rejects one character over the maximum with a message that gives the limit, and saves nothing (400)', async () => {
+    const res = await request(server)
+      .post('/api/requests')
+      .set('Cookie', authCookie)
+      .send({ ...validRequest, hospitalName: 'H'.repeat(MAX_HOSPITAL_NAME_LENGTH + 1) });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ message: 'Validation failed', errors: { hospitalName: TOO_LONG } });
+    expect(await Request.countDocuments()).toBe(0);
+  });
+
+  it.each([
+    ['spaces only', '     '],
+    ['tabs and new lines only', '\t\n \r\n'],
+    ['the empty string', ''],
+    ['one letter inside spaces', '   A   '],
+  ])('rejects a name of %s with a message, and saves nothing (400)', async (_label, hospitalName) => {
+    const res = await request(server).post('/api/requests').set('Cookie', authCookie).send({ ...validRequest, hospitalName });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ message: 'Validation failed', errors: { hospitalName: TOO_SHORT } });
     expect(await Request.countDocuments()).toBe(0);
   });
 });

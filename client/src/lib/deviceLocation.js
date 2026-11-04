@@ -1,5 +1,6 @@
 // Asking the browser where the device is: the "I'm at the hospital" backup on the New Request form
-// (HospitalLocationField) and the location button at sign-up (RegisterPage).
+// (HospitalLocationField), and the location buttons at sign-up (RegisterPage) and on the Profile
+// page (ProfilePage).
 
 /**
  * Options for navigator.geolocation.getCurrentPosition: a new position, never one the browser kept

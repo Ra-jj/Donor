@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
@@ -17,6 +17,10 @@ import {
   toDateInputValue,
 } from '../lib/donationGap';
 import { isExpiredRequest } from '../lib/requestExpiry';
+import { DEVICE_LOCATION_OPTIONS, describeDeviceLocationError } from '../lib/deviceLocation';
+
+// The loading, success and error messages of one press of the location button share this id
+const DEVICE_TOAST_ID = 'geo';
 
 // Re-reads when this donor may donate again, e.g. after a donation is marked fulfilled while this
 // page is open. Not checkAuth: a failed checkAuth sets authUser to null, and ProtectedRoute would
@@ -102,6 +106,17 @@ const ProfilePage = () => {
 
   const [locating, setLocating] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // Each press of the location button takes the next number, and a position or error that arrives
+  // for an older one is dropped. Leaving the page moves the number on, as on the sign-up page.
+  const deviceRequestRef = useRef(0);
+  const isDeviceRequestPendingRef = useRef(false);
+
+  // Leaving the page drops a position still on its way, and its "Fetching location..." message,
+  // which would otherwise stay up on the next page
+  useEffect(() => () => {
+    deviceRequestRef.current += 1;
+    if (isDeviceRequestPendingRef.current) toast.dismiss(DEVICE_TOAST_ID);
+  }, []);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -187,17 +202,31 @@ const ProfilePage = () => {
       toast.error('Geolocation is not supported by your browser');
       return;
     }
+    const requestId = ++deviceRequestRef.current;
+    isDeviceRequestPendingRef.current = true;
     setLocating(true);
+    toast.loading('Fetching location...', { id: DEVICE_TOAST_ID });
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setFormData({ ...formData, location: [position.coords.longitude, position.coords.latitude] });
+        if (requestId !== deviceRequestRef.current) return;
+        isDeviceRequestPendingRef.current = false;
+        // From the latest form, not this render's: the position can take seconds, and the user
+        // may edit another field meanwhile
+        setFormData((prev) => ({
+          ...prev,
+          location: [position.coords.longitude, position.coords.latitude],
+        }));
         setLocating(false);
-        toast.success('Location updated');
+        toast.success('Location updated', { id: DEVICE_TOAST_ID });
       },
-      () => {
+      (error) => {
+        if (requestId !== deviceRequestRef.current) return;
+        isDeviceRequestPendingRef.current = false;
         setLocating(false);
-        toast.error('Unable to retrieve your location');
-      }
+        console.error('Device location failed:', error);
+        toast.error(describeDeviceLocationError(error), { id: DEVICE_TOAST_ID });
+      },
+      DEVICE_LOCATION_OPTIONS,
     );
   };
 
@@ -324,7 +353,7 @@ const ProfilePage = () => {
           </div>
 
           <div className="md:col-span-2 flex justify-end mt-4">
-            <button type="submit" disabled={loading} className="btn btn-primary rounded-xl px-8 text-white font-bold shadow-lg shadow-primary/20">
+            <button type="submit" disabled={loading || locating} className="btn btn-primary rounded-xl px-8 text-white font-bold shadow-lg shadow-primary/20">
               {loading ? <span className="loading loading-spinner"></span> : 'Save Changes'}
             </button>
           </div>
@@ -351,18 +380,20 @@ const ProfilePage = () => {
                 <div className="space-y-3">
                   {history.pastDonations.map(req => (
                     <div key={req._id} className="bg-base-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                      <div>
-                        <div className="font-bold">{req.hospitalName}</div>
-                        {/* requesterId is null once the requester has deleted their account */}
-                        <div className="text-sm text-base-content/60">For {req.requesterId?.name || 'Deleted user'} • {new Date(req.fulfilledAt).toLocaleDateString()}</div>
+                      <div className="min-w-0">
+                        <div className="font-bold wrap-anywhere">{req.hospitalName}</div>
+                        {/* requesterId is null once the requester has deleted their account. The day is India's. */}
+                        <div className="text-sm text-base-content/60">
+                          For {req.requesterId?.name || 'Deleted user'} <span className="whitespace-nowrap">• {formatIndiaDate(req.fulfilledAt)}</span>
+                        </div>
                       </div>
                       {req.rating ? (
-                        <div className="bg-warning/10 px-3 py-2 rounded-xl flex items-center gap-2">
+                        <div className="bg-warning/10 px-3 py-2 rounded-xl flex items-center gap-2 shrink-0">
                           <StarRating rating={req.rating} size="w-4 h-4" />
                           <span className="text-sm font-bold text-warning">{req.rating}/5</span>
                         </div>
                       ) : (
-                        <div className="text-xs text-base-content/40 bg-base-300 px-3 py-1 rounded-full">Not rated</div>
+                        <div className="text-xs text-base-content/40 bg-base-300 px-3 py-1 rounded-full shrink-0">Not rated</div>
                       )}
                     </div>
                   ))}
@@ -380,8 +411,8 @@ const ProfilePage = () => {
                         <div className="font-bold">{req.unitsNeeded} {req.unitsNeeded === 1 ? 'unit' : 'units'} of {req.bloodGroup}</div>
                         <div className="text-sm text-base-content/60">
                           {/* matchedDonorId is null once the donor has deleted their account */}
-                          {req.status === 'fulfilled' && <>Donated by {req.matchedDonorId?.name || 'Deleted user'} • </>}
-                          {new Date(req.createdAt).toLocaleDateString()}
+                          {req.status === 'fulfilled' && <>Donated by {req.matchedDonorId?.name || 'Deleted user'} </>}
+                          <span className="whitespace-nowrap">{req.status === 'fulfilled' && '• '}{formatIndiaDate(req.createdAt)}</span>
                         </div>
                       </div>
                       <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>

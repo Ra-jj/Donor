@@ -28,6 +28,11 @@ const MINUTE_MS = 60 * 1000;
 // setTimeout fires at once for any longer delay
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
+// The signed-in user's id now, through getState, so callbacks set up once still read the latest.
+// A response is applied only while this is the id it was asked for: one that arrives after a
+// sign-out and a sign-in as someone else belongs to the earlier user.
+const getSignedInUserId = () => useAuthStore.getState().authUser?._id;
+
 /** "Open for 31 more hours" on a requester's own pending request, kept current while it is shown */
 const OpenTimeLeft = ({ createdAt }) => {
   const [nowMs, setNowMs] = useState(Date.now);
@@ -173,41 +178,51 @@ const DashboardPage = () => {
   // silent: refresh in place, without the full-page spinner that would remount ChatWindow
   // (losing the draft, focus and scroll). State is only set in the promise callbacks, once the
   // requests settle, so the mount effect below never sets state synchronously.
-  const fetchDashboardData = ({ silent = false } = {}) => Promise.all([
-    axiosInstance.get('/requests/mine'),
-    axiosInstance.get('/requests/incoming'),
-    axiosInstance.get('/users/stats'),
-  ])
-    .then(([mineRes, incomingRes, statsRes]) => {
-      setMyRequests(mineRes.data.requests);
-      // A request of theirs that closed after its open hours while they were away (the update over
-      // the socket only reaches a page that is open) gets its popup now, once per device
-      announceMissedExpiredRequests(useAuthStore.getState().authUser?._id, mineRes.data.requests);
-      setIncomingRequests(incomingRes.data.incomingRequests);
-      setHasActiveDonation(Boolean(incomingRes.data.hasActiveDonation));
-      // Through getState, a module-level reference, so this function (used by the effects
-      // below that run once) depends on nothing that changes between renders
-      useAuthStore.getState().setNextEligibleDonationAt(incomingRes.data.nextEligibleDonationAt ?? null);
-      setStats(statsRes.data);
+  // The answers are dropped if the signed-in user changed while they were on their way: a sign-out
+  // and a sign-in as someone else would otherwise put this user's requests, popups and donation
+  // date (kept on authUser, which outlives this page) into the next user's session.
+  const fetchDashboardData = ({ silent = false } = {}) => {
+    const userIdAtStart = getSignedInUserId();
+    const isForAnotherUser = () => getSignedInUserId() !== userIdAtStart;
+    return Promise.all([
+      axiosInstance.get('/requests/mine'),
+      axiosInstance.get('/requests/incoming'),
+      axiosInstance.get('/users/stats'),
+    ])
+      .then(([mineRes, incomingRes, statsRes]) => {
+        if (isForAnotherUser()) return;
+        setMyRequests(mineRes.data.requests);
+        // A request of theirs that closed after its open hours while they were away (the update over
+        // the socket only reaches a page that is open) gets its popup now, once per device
+        announceMissedExpiredRequests(userIdAtStart, mineRes.data.requests);
+        setIncomingRequests(incomingRes.data.incomingRequests);
+        setHasActiveDonation(Boolean(incomingRes.data.hasActiveDonation));
+        // Through getState, a module-level reference, so this function (used by the effects
+        // below that run once) depends on nothing that changes between renders
+        useAuthStore.getState().setNextEligibleDonationAt(incomingRes.data.nextEligibleDonationAt ?? null);
+        setStats(statsRes.data);
 
-      // After a quiet refresh, a selected request that is no longer accepted has no chat,
-      // so return to the list instead of the placeholder. A request is in only one list.
-      if (silent) {
-        const refreshed = [...mineRes.data.requests, ...incomingRes.data.incomingRequests];
-        setSelectedRequestId((cur) => {
-          if (!cur) return cur;
-          const selected = refreshed.find((req) => req._id === cur);
-          return selected && selected.status === 'accepted' ? cur : null;
-        });
-      }
-    })
-    .catch((error) => {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard');
-    })
-    .finally(() => {
-      if (!silent) setLoading(false);
-    });
+        // After a quiet refresh, a selected request that is no longer accepted has no chat,
+        // so return to the list instead of the placeholder. A request is in only one list.
+        if (silent) {
+          const refreshed = [...mineRes.data.requests, ...incomingRes.data.incomingRequests];
+          setSelectedRequestId((cur) => {
+            if (!cur) return cur;
+            const selected = refreshed.find((req) => req._id === cur);
+            return selected && selected.status === 'accepted' ? cur : null;
+          });
+        }
+      })
+      .catch((error) => {
+        // The earlier user's failed load is not the next user's problem
+        if (isForAnotherUser()) return;
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard');
+      })
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
+  };
 
   // Refetch behind the full-page spinner, for the action handlers. The first load does not
   // go through here: loading already starts true, so it has no spinner to turn on.
@@ -236,7 +251,8 @@ const DashboardPage = () => {
           <br/>
           {newRequestData.unitsNeeded} {newRequestData.unitsNeeded === 1 ? 'unit' : 'units'} of {newRequestData.bloodGroup} needed at {newRequestData.hospitalName}.
         </div>, 
-        { duration: 6000, icon: '🚨' }
+        // wrap-anywhere: a hospital name with no spaces wraps inside the popup instead of running past it
+        { duration: 6000, icon: '🚨', className: 'wrap-anywhere' }
       );
       // A request can be announced again once it is open again (its donor deleted their
       // account), so replace a card this donor may still hold for it rather than add a second
@@ -336,7 +352,12 @@ const DashboardPage = () => {
       if (data.status === 'fulfilled') {
         fetchDashboardData({ silent: true });
       } else {
-        axiosInstance.get('/users/stats').then(res => setStats(res.data)).catch(() => {});
+        const userIdAtStart = getSignedInUserId();
+        axiosInstance.get('/users/stats')
+          .then((res) => {
+            if (getSignedInUserId() === userIdAtStart) setStats(res.data);
+          })
+          .catch(() => {});
       }
     };
 
@@ -546,10 +567,12 @@ const DashboardPage = () => {
       )}
 
       {/* Tabs with animated indicator */}
+      {/* Narrower than 390 px the two buttons get less padding, and narrower than 360 px no icons,
+          so both still fit side by side (with a two-digit count too) */}
       <div className={`flex justify-center sm:justify-start ${selectedRequestId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="bg-base-100 border border-base-300 p-1.5 rounded-2xl inline-flex shadow-sm w-full sm:w-auto relative">
           <button 
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'incoming' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 min-[390px]:px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'incoming' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
             onClick={() => { setActiveTab('incoming'); setSelectedRequestId(null); }}
           >
             {activeTab === 'incoming' && (
@@ -560,17 +583,17 @@ const DashboardPage = () => {
                 {incomingRequests.filter(r => r.status === 'pending').length}
               </span>
             )}
-            <BellRingingIcon weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5" />
+            <BellRingingIcon weight={activeTab === 'incoming' ? "fill" : "regular"} className="w-5 h-5 max-[360px]:hidden" />
             <span className="relative z-10">Incoming Matches</span>
           </button>
           <button 
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 min-[390px]:px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
             onClick={() => { setActiveTab('mine'); setSelectedRequestId(null); }}
           >
             {activeTab === 'mine' && (
               <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
             )}
-            <ClockClockwiseIcon weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5" />
+            <ClockClockwiseIcon weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5 max-[360px]:hidden" />
             <span className="relative z-10">My Requests</span>
           </button>
         </div>
@@ -628,7 +651,7 @@ const DashboardPage = () => {
                             <div className="bg-success/5 border border-success/10 rounded-2xl p-5 text-center space-y-3">
                               <CheckCircleIcon weight="fill" className="w-12 h-12 text-success mx-auto" />
                               <h3 className="font-display font-bold text-lg text-success">Donation Complete!</h3>
-                              <p className="text-sm text-base-content/70">
+                              <p className="text-sm text-base-content/70 wrap-anywhere">
                                 Thank you for donating at <strong>{req.hospitalName}</strong>.
                               </p>
                               {req.rating ? (
@@ -666,8 +689,12 @@ const DashboardPage = () => {
                               </div>
                             )}
                             <div className="card-body p-5">
-                              <div className="flex justify-between items-start gap-3">
-                                <h3 className="card-title text-lg flex-1 leading-snug">{req.hospitalName}</h3>
+                              {/* The match and urgency pills go below the name only when its longest word would
+                                  not fit beside them. A word wider than the card (a name with no spaces) takes a
+                                  whole row and breaks there: max-w-full caps the name's minimum width at the row,
+                                  and block (card-title is flex) lets break-word break inside the h3 itself. */}
+                              <div className="flex flex-wrap justify-between items-start gap-3">
+                                <h3 className="card-title block flex-1 max-w-full wrap-break-word text-lg leading-snug">{req.hospitalName}</h3>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {req.matchType === 'exact' ? (
                                     <span className="badge badge-success badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-success/20">Exact Match</span>
@@ -748,9 +775,11 @@ const DashboardPage = () => {
                         className={`card bg-base-100 shadow-md border transition-all ${req.status === 'accepted' ? 'cursor-pointer hover:border-primary' : 'border-base-200'} ${selectedRequestId === req._id ? 'border-primary ring-2 ring-primary/50' : ''}`}
                       >
                         <div className="card-body p-5">
-                          <div className="flex justify-between items-start">
-                            <h3 className="card-title text-lg">{req.hospitalName}</h3>
-                            <div className={`badge ${
+                          {/* As on the incoming cards: the state pill goes below the name only when the
+                              name's longest word would not fit beside it */}
+                          <div className="flex flex-wrap justify-between items-start gap-y-2">
+                            <h3 className="card-title block flex-1 max-w-full wrap-break-word text-lg">{req.hospitalName}</h3>
+                            <div className={`badge shrink-0 ${
                               req.status === 'pending' ? 'badge-warning' : 
                               req.status === 'accepted' ? 'badge-success text-white' : 
                               req.status === 'fulfilled' ? 'badge-info text-white' : ''
@@ -804,7 +833,10 @@ const DashboardPage = () => {
                             <div className="mt-3 space-y-3">
                               <div className="flex items-center gap-2 text-sm text-info font-semibold">
                                 <CheckCircleIcon weight="fill" className="w-4 h-4" />
-                                Fulfilled {req.fulfilledAt && `on ${new Date(req.fulfilledAt).toLocaleDateString()}`}
+                                {/* The day in India, wherever the browser is */}
+                                <span>
+                                  Fulfilled{req.fulfilledAt && <> on <span className="whitespace-nowrap">{formatIndiaDate(req.fulfilledAt)}</span></>}
+                                </span>
                               </div>
 
                               {req.rating ? (
@@ -893,7 +925,7 @@ const DashboardPage = () => {
             const backToRequestsButton = (
               <button
                 onClick={() => setSelectedRequestId(null)}
-                className="lg:hidden text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
+                className="lg:hidden shrink-0 whitespace-nowrap text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
               >
                 ← Back to Requests
               </button>
@@ -907,8 +939,8 @@ const DashboardPage = () => {
                   transition={{ duration: 0.3 }}
                   className="w-full flex flex-col"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-semibold opacity-70">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="text-sm font-semibold opacity-70 min-w-0 wrap-anywhere">
                       Coordinating for: {activeChatRequest.hospitalName}
                     </div>
                     {backToRequestsButton}

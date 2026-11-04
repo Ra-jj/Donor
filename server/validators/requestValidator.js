@@ -5,6 +5,9 @@ const URGENCIES = ['low', 'medium', 'high'];
 // 'fulfilled' is deliberately absent: fulfilment goes only through PATCH /:id/fulfill,
 // which checks that the caller is the requester.
 const STATUS_UPDATES = ['accepted', 'declined', 'cancelled'];
+// Donors see the hospital name on their cards, in push alerts and in shared messages. The New
+// Request form's name field allows the same number (client/src/lib/hospitalName.js).
+const MAX_HOSPITAL_NAME_LENGTH = 150;
 
 // Zod 4 takes a custom message through `error`. The Zod 3 params `errorMap` and
 // `invalid_type_error` are silently ignored, so they never produced these messages.
@@ -17,7 +20,13 @@ const createRequestSchema = z.object({
     .int('Units needed must be a whole number')
     .min(1, 'At least 1 unit is required')
     .max(20, 'Maximum 20 units can be requested at once'),
-  hospitalName: z.string().min(2, 'Hospital name must be at least 2 characters long'),
+  // Trimmed first, so the limits count the name itself, and a name of only spaces is refused here
+  // rather than passing this check and then failing the model's required check (a 500)
+  hospitalName: z
+    .string()
+    .trim()
+    .min(2, 'Hospital name must be at least 2 characters long')
+    .max(MAX_HOSPITAL_NAME_LENGTH, `Hospital name cannot be longer than ${MAX_HOSPITAL_NAME_LENGTH} characters`),
   hospitalLocation: z
     .array(z.number())
     .length(2, 'Location must be an array of exactly 2 numbers [longitude, latitude]')
@@ -49,6 +58,7 @@ const updateRequestStatusSchema = z.object({
 });
 
 module.exports = {
+  MAX_HOSPITAL_NAME_LENGTH,
   createRequestSchema,
   rateRequestSchema,
   updateRequestStatusSchema,
