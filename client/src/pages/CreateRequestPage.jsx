@@ -12,6 +12,7 @@ import HospitalLocationField, { HOSPITAL_SEARCH_INPUT_ID } from '../components/H
 import ShareRequestButtons from '../components/ShareRequestButtons';
 import { isExpiredRequest, describeExpiredRequest } from '../lib/requestExpiry';
 import { markExpiredRequestSeen } from '../lib/expiredRequestPopups';
+import { MAX_HOSPITAL_NAME_LENGTH, fitHospitalName } from '../lib/hospitalName';
 import { useAuthStore } from '../store/useAuthStore';
 
 const DonorMap = lazy(loadDonorMap);
@@ -87,7 +88,8 @@ const CreateRequestPage = () => {
     if (location) setErrors((prev) => ({ ...prev, hospitalLocation: '' }));
   };
 
-  // The result's name becomes the hospital name, which stays editable
+  // The result's name becomes the hospital name, which stays editable. A name longer than the
+  // server takes is cut to fit, so it can't be refused later.
   const handlePlacePicked = (place) => {
     setHospitalLocation({
       coordinates: place.coordinates,
@@ -95,7 +97,7 @@ const CreateRequestPage = () => {
       name: place.name,
       addressLine: place.addressLine,
     });
-    setFormData((prev) => ({ ...prev, hospitalName: place.name }));
+    setFormData((prev) => ({ ...prev, hospitalName: fitHospitalName(place.name) }));
     setErrors((prev) => ({ ...prev, hospitalLocation: '', hospitalName: '' }));
   };
 
@@ -151,7 +153,7 @@ const CreateRequestPage = () => {
                 <HeartbeatIcon weight="fill" className="w-8 h-8" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-display font-bold text-base-content hyphens-auto">Request Broadcasted</h2>
-              <p className="text-base-content/70 mt-2">
+              <p className="text-base-content/70 mt-2 wrap-anywhere">
                 We've found <strong>{successData.matchedDonorCount ?? 0}</strong> compatible donors near {successData.sentHospitalName}.
               </p>
             </div>
@@ -278,6 +280,7 @@ const CreateRequestPage = () => {
                   className={`input w-full pl-12 rounded-xl border ${errors.hospitalName ? 'border-error focus:border-error focus:ring-error' : 'border-base-300 focus:border-primary focus:ring-primary'} bg-base-100 shadow-sm focus:ring-1 transition-all text-base`} 
                   placeholder="e.g. City General Hospital"
                   required
+                  maxLength={MAX_HOSPITAL_NAME_LENGTH}
                   value={formData.hospitalName}
                   onChange={(e) => {
                     setFormData({ ...formData, hospitalName: e.target.value });
