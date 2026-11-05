@@ -26,6 +26,7 @@ const requestRoutes = require('./routes/request.route');
 const messageRoutes = require('./routes/message.route');
 const pushRoutes = require('./routes/push.route');
 const userRoutes = require('./routes/user.route');
+const publicRoutes = require('./routes/public.route');
 const { createSecurityHeaders } = require('./middleware/securityHeaders');
 const { parseTrustProxy } = require('./utils/parseTrustProxy');
 const { startRequestExpirySweeps } = require('./utils/requestExpiry');
@@ -50,6 +51,7 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/public', publicRoutes);
 
 const path = require('path');
 
@@ -95,6 +97,10 @@ if (isProduction) {
   app.use(express.static(clientDistPath));
 
   app.use((req, res) => {
+    // A shared request's page (/r/<token>) is built in the browser from the public API, which
+    // already says noindex; this says it for the page itself, so a link posted somewhere public
+    // does not put the request in search results
+    if (req.path.startsWith('/r/')) res.set('X-Robots-Tag', 'noindex');
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 }

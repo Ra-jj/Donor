@@ -9,7 +9,8 @@
  *
  * The server sleeps when idle (Render's free plan), so no timer can be trusted to close a request
  * on time. Expiry is therefore enforced from createdAt wherever it matters:
- *   - reads: getIncomingRequests never lists a pending request past its hours;
+ *   - reads: getIncomingRequests never lists a pending request past its hours, and a shared
+ *     request's public page (getSharedRequest) shows it as closed;
  *   - writes: an accept, a decline, or a cancel of a pending request matches only a request still
  *     inside them;
  *   - expireStaleRequests below marks the ones past them and tells each requester. It runs at
@@ -40,6 +41,13 @@ const SWEEP_WRITE_BATCH_SIZE = 10;
  * @returns {Date}
  */
 const getRequestOpenCutoff = (nowMs = Date.now()) => new Date(nowMs - REQUEST_OPEN_MS);
+
+/**
+ * When a pending request closes: REQUEST_OPEN_HOURS after it was created
+ * @param {{ createdAt: Date }} request
+ * @returns {Date}
+ */
+const getRequestExpiresAt = (request) => new Date(request.createdAt.getTime() + REQUEST_OPEN_MS);
 
 // Request filter: created inside the open hours, so a pending one is still open. A field-level
 // condition, so callers can spread it into a query that has its own $or.
@@ -183,6 +191,7 @@ module.exports = {
   SWEEP_INTERVAL_MS,
   LAZY_SWEEP_MIN_GAP_MS,
   getRequestOpenCutoff,
+  getRequestExpiresAt,
   stillOpenFilter,
   hasExpired,
   expireStaleRequests,

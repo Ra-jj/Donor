@@ -6,6 +6,7 @@ const {
   updateRequestStatus,
   fulfillRequest,
   rateRequest,
+  getShareLink,
 } = require('../controllers/request.controller');
 const protectRoute = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
@@ -28,5 +29,7 @@ const validateRequestId = validateObjectIdParam('id');
 router.patch('/:id/status', protectRoute, validateRequestId, validate(updateRequestStatusSchema), updateRequestStatus);
 router.patch('/:id/fulfill', protectRoute, validateRequestId, fulfillRequest);
 router.post('/:id/rate', protectRoute, validateRequestId, validate(rateRequestSchema), rateRequest);
+// The token of the requester's own share link, made on the first call (see getShareLink)
+router.post('/:id/share-link', protectRoute, validateRequestId, getShareLink);
 
 module.exports = router;

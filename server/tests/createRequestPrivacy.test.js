@@ -282,7 +282,9 @@ describe('POST /api/requests donor privacy', () => {
     const res = await createBloodRequest(requester.cookie, 'B+', HOSPITAL);
 
     expect(res.statusCode).toBe(201);
-    expect(Object.keys(res.body).sort()).toEqual(['donorPins', 'matchedDonorCount', 'message', 'request']);
+    // shareToken: the requester's own link token (tests/publicRequest.test.js), about the request
+    // and nothing else, so it says nothing about donors
+    expect(Object.keys(res.body).sort()).toEqual(['donorPins', 'matchedDonorCount', 'message', 'request', 'shareToken']);
     expect(res.body).not.toHaveProperty('matchedDonors');
     expect(res.body).not.toHaveProperty('matchedDonorDetails');
 

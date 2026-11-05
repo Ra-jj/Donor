@@ -22,6 +22,16 @@ export const formatIndiaDate = (instant) =>
     year: 'numeric',
   });
 
+// e.g. "3:45 pm IST": the time in India, with the zone named, since a shared request's page
+// (pages/PublicRequestPage.jsx) can be opened anywhere. Shown after formatIndiaDate's day.
+export const formatIndiaTime = (instant) =>
+  `${new Date(instant).toLocaleTimeString('en-IN', {
+    timeZone: INDIA_TIME_ZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })} IST`;
+
 // Today in India as YYYY-MM-DD, the format of an <input type="date"> value
 export const getTodayInIndiaDateString = () =>
   new Date(Date.now() + INDIA_UTC_OFFSET_MS).toISOString().slice(0, 10);
