@@ -87,6 +87,20 @@ describe('production static serving of the client build', () => {
     expect(res.headers['content-security-policy']).toContain("default-src 'self'");
   });
 
+  it("should serve index.html for a shared request's page, and keep it out of search engines", async () => {
+    const res = await request(server).get('/r/AbCdEfGhIjKlMnOpQrStUw');
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^text\/html/);
+    expect(res.text).toBe(INDEX_HTML);
+    expect(res.headers['x-robots-tag']).toBe('noindex');
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+  });
+
+  it('should leave the other pages indexable', async () => {
+    const res = await request(server).get('/dashboard');
+    expect(res.headers).not.toHaveProperty('x-robots-tag');
+  });
+
   it('should keep root files such as sw.js at max-age=0', async () => {
     const res = await request(server).get('/sw.js');
     expect(res.statusCode).toBe(200);

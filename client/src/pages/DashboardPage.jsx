@@ -20,6 +20,7 @@ import {
   EXPIRED_NOTE,
 } from '../lib/requestExpiry';
 import { announceExpiredRequest, announceMissedExpiredRequests } from '../lib/expiredRequestPopups';
+import { buildRepostState } from '../lib/repostRequest';
 import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
 
 const DonorMap = lazy(loadDonorMap);
@@ -792,15 +793,17 @@ const DashboardPage = () => {
                           </p>
                           {req.status === 'pending' && <OpenTimeLeft createdAt={req.createdAt} />}
 
-                          {/* Closed after its open hours with no donor. Asking again starts a new request. */}
+                          {/* Closed after its open hours with no donor. Posting again opens the form filled in
+                              with this request's details; the requester sends it from there. */}
                           {isExpiredRequest(req) && (
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                               <p className="text-sm text-base-content/70">{EXPIRED_NOTE}</p>
                               <Link
                                 to="/create-request"
+                                state={buildRepostState(req)}
                                 className="btn btn-sm btn-outline btn-primary rounded-xl font-bold"
                               >
-                                Ask again
+                                Post again
                               </Link>
                             </div>
                           )}

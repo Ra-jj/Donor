@@ -17,6 +17,7 @@ import {
   toDateInputValue,
 } from '../lib/donationGap';
 import { isExpiredRequest } from '../lib/requestExpiry';
+import { buildRepostState } from '../lib/repostRequest';
 import { DEVICE_LOCATION_OPTIONS, describeDeviceLocationError } from '../lib/deviceLocation';
 
 // The loading, success and error messages of one press of the location button share this id
@@ -415,9 +416,23 @@ const ProfilePage = () => {
                           <span className="whitespace-nowrap">{req.status === 'fulfilled' && '• '}{formatIndiaDate(req.createdAt)}</span>
                         </div>
                       </div>
-                      <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>
-                        {isExpiredRequest(req) ? 'expired' : req.status}
-                      </div>
+                      {isExpiredRequest(req) ? (
+                        // Opens the New Request form filled in with this request's details, to send again
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                          <div className="badge badge-ghost">expired</div>
+                          <Link
+                            to="/create-request"
+                            state={buildRepostState(req)}
+                            className="btn btn-sm btn-outline btn-primary rounded-xl font-bold"
+                          >
+                            Post again
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>
+                          {req.status}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

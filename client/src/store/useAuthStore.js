@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { axiosInstance } from '../lib/axios';
 import { initSocket, disconnectSocket } from '../lib/socket';
 import { clearLoginPageMessage, showOnLoginPage } from '../lib/loginPageMessage';
+import { clearShareTokenCache } from '../lib/shareTokenCache';
 import toast from 'react-hot-toast';
 
 // Shown inside the delete-account dialog, which stays open, so each says what to do next
@@ -149,6 +150,7 @@ export const useAuthStore = create((set, get) => ({
       await axiosInstance.post('/auth/logout');
       set({ authUser: null });
       disconnectSocket();
+      clearShareTokenCache();
       toast.success('Logged out successfully');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Logout failed');

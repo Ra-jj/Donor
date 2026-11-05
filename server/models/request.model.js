@@ -4,8 +4,11 @@ const mongoose = require('mongoose');
 // declined no longer sees the request), but it must never leave the server, so it is dropped
 // from every toJSON (res.json, socket emits) and toObject result. Queries, $addToSet and
 // document getters (request.declinedBy) are unaffected.
-const hideDeclinedBy = (doc, ret) => {
+// shareToken is dropped the same way: it opens the request's public page, so it goes only to the
+// requester, and only where a controller sends it on purpose (createRequest, getShareLink).
+const hideServerOnlyFields = (doc, ret) => {
   delete ret.declinedBy;
+  delete ret.shareToken;
   return ret;
 };
 
@@ -92,11 +95,18 @@ const requestSchema = new mongoose.Schema(
       trim: true,
       maxlength: 500,
     },
+    // The random code in the link to this request's public page (utils/shareToken.js). Set when the
+    // request is created; a request from before links existed gets one when its requester first
+    // shares it. No default: a default would also fill it in, unsaved, on every older request read.
+    // Never set to null, which the sparse index below would count as a value.
+    shareToken: {
+      type: String,
+    },
   },
   {
     timestamps: true,
-    toJSON: { transform: hideDeclinedBy },
-    toObject: { transform: hideDeclinedBy },
+    toJSON: { transform: hideServerOnlyFields },
+    toObject: { transform: hideServerOnlyFields },
   }
 );
 
@@ -118,5 +128,9 @@ requestSchema.index({ status: 1, fulfilledAt: 1, matchedDonorId: 1 });
 // Serves the expiry sweep (utils/requestExpiry.js): pending requests created before a cutoff, a
 // range that is empty or nearly so between sweeps
 requestSchema.index({ status: 1, createdAt: 1 });
+
+// Finds a request by the token in its public link. Unique, so one link always means one request.
+// Sparse: requests without a token (those from before links existed) are not in it at all.
+requestSchema.index({ shareToken: 1 }, { unique: true, sparse: true, name: 'share_token' });
 
 module.exports = mongoose.model('Request', requestSchema);

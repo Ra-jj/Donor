@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon } from '@phosphor-icons/react';
+import { BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon, ArrowCounterClockwiseIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
@@ -13,6 +13,7 @@ import ShareRequestButtons from '../components/ShareRequestButtons';
 import { isExpiredRequest, describeExpiredRequest } from '../lib/requestExpiry';
 import { markExpiredRequestSeen } from '../lib/expiredRequestPopups';
 import { MAX_HOSPITAL_NAME_LENGTH, fitHospitalName } from '../lib/hospitalName';
+import { readRepostDraft } from '../lib/repostRequest';
 import { useAuthStore } from '../store/useAuthStore';
 
 const DonorMap = lazy(loadDonorMap);
@@ -20,12 +21,18 @@ const MISSING_LOCATION_ERROR =
   "Choose the hospital from the search results, or use your location if you're at the hospital.";
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const REPOST_NOTE = 'Check the details, then choose Broadcast Emergency Request to post again.';
 
 const CreateRequestPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  // "Post again" on an expired request (lib/repostRequest.js) opens this page with that request's
+  // details in the router state. Read once, on the first render, as the form's starting values.
+  const [repostDraft] = useState(() => readRepostDraft(location.state));
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [successData, setSuccessData] = useState(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => repostDraft?.formData ?? {
     bloodGroup: '',
     unitsNeeded: 1,
     hospitalName: '',
@@ -33,7 +40,21 @@ const CreateRequestPage = () => {
   });
   // null, or { coordinates: [longitude, latitude], source: 'search' | 'device', name?, addressLine? }
   // (components/HospitalLocationField.jsx). Only the coordinates are sent.
-  const [hospitalLocation, setHospitalLocation] = useState(null);
+  const [hospitalLocation, setHospitalLocation] = useState(() => repostDraft?.hospitalLocation ?? null);
+  // The form holds an earlier request's details, so it says so above the fields
+  const [isPostingAgain, setIsPostingAgain] = useState(Boolean(repostDraft));
+
+  // The router state lives in the browser's history entry, so a refresh, or coming back to this
+  // entry with Back or Forward, would fill the form again from it, over whatever the requester did
+  // since. Once read, it is taken off the entry: from then on this page opens empty, as usual.
+  const hasRepostState = location.state?.repost !== undefined;
+  useEffect(() => {
+    if (!hasRepostState) return;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: null }
+    );
+  }, [hasRepostState, navigate, location.pathname, location.search, location.hash]);
 
   // The pick preview and the success screen show the map: load it now, before a new build can
   // replace it (lib/loadDonorMap.js)
@@ -184,7 +205,7 @@ const CreateRequestPage = () => {
                   <h3 id="share-request-heading" className="text-lg font-display font-bold text-base-content mb-3">
                     Share with people not on Donor
                   </h3>
-                  <ShareRequestButtons request={successData.request} />
+                  <ShareRequestButtons request={successData.request} shareToken={successData.shareToken} />
                 </section>
               )}
               {successData.request?.status === 'accepted' && (
@@ -198,10 +219,13 @@ const CreateRequestPage = () => {
                   <p className="wrap-anywhere">{describeExpiredRequest(successData.request.hospitalName)}</p>
                   <button
                     type="button"
-                    onClick={() => setSuccessData(null)}
+                    onClick={() => {
+                      setIsPostingAgain(true);
+                      setSuccessData(null);
+                    }}
                     className="btn btn-sm btn-outline btn-primary rounded-xl font-bold"
                   >
-                    Ask again
+                    Post again
                   </button>
                 </div>
               )}
@@ -243,6 +267,13 @@ const CreateRequestPage = () => {
               Create an emergency broadcast. We'll notify compatible donors within a 15km radius immediately.
             </p>
           </motion.div>
+
+          {isPostingAgain && (
+            <div className="mb-6 bg-info/10 border border-info/20 rounded-2xl p-4 text-sm font-medium text-base-content flex items-start gap-3">
+              <ArrowCounterClockwiseIcon weight="bold" className="w-5 h-5 text-info shrink-0 mt-0.5" aria-hidden="true" />
+              <p>{REPOST_NOTE}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -406,7 +437,7 @@ const CreateRequestPage = () => {
               transition={fieldDelay(5)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none min-h-14 h-auto py-2 leading-tight text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency Request'}
               </button>
             </motion.div>

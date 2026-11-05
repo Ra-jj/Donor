@@ -21,8 +21,16 @@ const DashboardPage = lazyPage(() => import('./pages/DashboardPage'));
 const CreateRequestPage = lazyPage(() => import('./pages/CreateRequestPage'));
 const ProfilePage = lazyPage(() => import('./pages/ProfilePage'));
 const PrivacyPage = lazyPage(() => import('./pages/PrivacyPage'));
+const PublicRequestPage = lazyPage(() => import('./pages/PublicRequestPage'));
 // Not a route: shown in place of the routes while the user must agree to the current notice
 const PrivacyConsentPage = lazyPage(() => import('./pages/PrivacyConsentPage'));
+
+// A shared request's page, /r/<share token>: the one route with a parameter
+const PUBLIC_REQUEST_ROUTE = '/r/:token';
+const PUBLIC_REQUEST_PATH = /^\/r\/[^/]+\/?$/;
+
+// The key of a URL in the tables below: its path, or the route of a shared request's page
+const routeKeyFor = (pathname) => (PUBLIC_REQUEST_PATH.test(pathname) ? PUBLIC_REQUEST_ROUTE : pathname);
 
 // Must match the <Route> paths below
 const PAGE_BY_PATH = {
@@ -33,6 +41,7 @@ const PAGE_BY_PATH = {
   '/create-request': CreateRequestPage,
   '/profile': ProfilePage,
   '/privacy': PrivacyPage,
+  [PUBLIC_REQUEST_ROUTE]: PublicRequestPage,
 };
 
 // Pages likely to be opened next, prefetched once the current page is in. Matters most for
@@ -45,24 +54,27 @@ const LIKELY_NEXT_PAGES = {
   '/dashboard': [LoginPage],
   '/create-request': [DashboardPage, LoginPage],
   '/profile': [DashboardPage, LoginPage],
+  // Mostly opened from a shared link by someone not signed in, who goes on to one of these
+  [PUBLIC_REQUEST_ROUTE]: [RegisterPage, LoginPage],
 };
 
 // A signed-in user who has not agreed to the current Privacy Notice (the server decides, see
 // server/utils/privacyConsent.js) sees the consent screen instead of any page, on every URL but
-// /privacy, which must stay readable from that screen
+// /privacy, which must stay readable from that screen, and a shared request's page, which shows
+// them exactly what it shows anyone without an account
 const isPrivacyConsentPending = (pathname, authUser) =>
-  Boolean(authUser?.needsPrivacyConsent) && pathname !== '/privacy';
+  Boolean(authUser?.needsPrivacyConsent) && pathname !== '/privacy' && !PUBLIC_REQUEST_PATH.test(pathname);
 
 // The page really shown for a URL once auth is known. Must match the consent screen above and the
 // routes' redirects below: '/', '/login' and '/register' send a logged-in user to /dashboard, and
-// ProtectedRoute sends a logged-out user to /login. /privacy is shown to everyone.
+// ProtectedRoute sends a logged-out user to /login. /privacy and /r/<token> are shown to everyone.
 const PUBLIC_ONLY_PATHS = ['/', '/login', '/register'];
 const PROTECTED_PATHS = ['/dashboard', '/create-request', '/profile'];
 const pageShownFor = (pathname, authUser) => {
   if (isPrivacyConsentPending(pathname, authUser)) return PrivacyConsentPage;
   if (authUser && PUBLIC_ONLY_PATHS.includes(pathname)) return DashboardPage;
   if (!authUser && PROTECTED_PATHS.includes(pathname)) return LoginPage;
-  return PAGE_BY_PATH[pathname];
+  return PAGE_BY_PATH[routeKeyFor(pathname)];
 };
 
 // Resolves once the page's chunk is in or has failed. A failure is not lost: lazyPage keeps it,
@@ -130,7 +142,7 @@ function App() {
   // auth check, and on navigation during the old page's exit animation (AnimatePresence
   // mode="wait" only renders the new page once that animation ends)
   useEffect(() => {
-    const page = PAGE_BY_PATH[location.pathname];
+    const page = PAGE_BY_PATH[routeKeyFor(location.pathname)];
     if (page) preloadPage(page);
   }, [location.pathname]);
 
@@ -154,12 +166,13 @@ function App() {
   // idle moment, so it never takes bandwidth from what is on screen (while a chunk downloads the
   // browser is idle too)
   useEffect(() => {
-    const likelyNextPages = LIKELY_NEXT_PAGES[location.pathname];
+    const routeKey = routeKeyFor(location.pathname);
+    const likelyNextPages = LIKELY_NEXT_PAGES[routeKey];
     if (!isFirstPageSettled || !likelyNextPages) return;
     let isCancelled = false;
     let cancelIdlePrefetch = null;
     // A failed chunk is already logged by the preload effect above, so only success matters here
-    PAGE_BY_PATH[location.pathname].preload().then(() => {
+    PAGE_BY_PATH[routeKey].preload().then(() => {
       if (!isCancelled) cancelIdlePrefetch = runWhenIdle(() => likelyNextPages.forEach(preloadPage));
     }, () => {});
     return () => {
@@ -252,6 +265,12 @@ function App() {
             <Route path="/privacy" element={
               <PageTransition className="container mx-auto px-4 py-8 max-w-3xl">
                 <PrivacyPage />
+              </PageTransition>
+            } />
+            {/* A shared request's page: public in the same way */}
+            <Route path={PUBLIC_REQUEST_ROUTE} element={
+              <PageTransition className="container mx-auto px-4 py-8 max-w-xl">
+                <PublicRequestPage />
               </PageTransition>
             } />
           </Routes>

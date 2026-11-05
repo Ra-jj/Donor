@@ -99,11 +99,30 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Limit reads of shared request pages (GET /api/public/requests/:token) per IP address. Anyone can
+ * call it without an account, so this caps how fast one address can try tokens or load the
+ * database. Loose on purpose: everyone who opens a link shared in one WhatsApp group may come
+ * through the same mobile network IP (CGNAT), and each page view is one call.
+ */
+const publicRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 300,
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many requests from this network. Please wait a few minutes and try again.',
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   loginLimiter,
   requestLimiter,
   deleteAccountLimiter,
   registerLimiter,
+  publicRequestLimiter,
   resolveRegisterLimitConfig,
   DEFAULT_REGISTER_LIMIT,
 };

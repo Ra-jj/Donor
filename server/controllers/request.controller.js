@@ -24,10 +24,12 @@ const {
 const {
   stillOpenFilter,
   hasExpired,
+  getRequestExpiresAt,
   expireStaleRequestsLogged,
   expireRequesterStaleRequests,
   expireStaleRequestsIfDue,
 } = require('../utils/requestExpiry');
+const { generateShareToken } = require('../utils/shareToken');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -193,6 +195,8 @@ exports.createRequest = async (req, res) => {
       },
       urgency: urgency || 'medium',
       status: 'pending',
+      // For the link the requester can share (utils/shareToken.js)
+      shareToken: generateShareToken(),
     });
 
     await newRequest.save();
@@ -227,11 +231,14 @@ exports.createRequest = async (req, res) => {
 
     res.status(201).json({
       message: 'Request created and donors matched successfully',
+      // Without its shareToken (the model's toJSON drops it), which is sent on its own below
       request: newRequest,
       // Any logged-in user can create a request anywhere, so only a count and ~1.1 km pins
       // go back: no donor ids, names, emails, blood groups, push data or exact coordinates.
       matchedDonorCount: visibleDonorPoints.length,
       donorPins: buildDonorPins(visibleDonorPoints),
+      // The requester's own request, so its share link's token can go to them, and only to them
+      shareToken: newRequest.shareToken,
     });
 
     // 3. Emit real-time socket events and web push notifications to matched donors.
@@ -578,6 +585,109 @@ const cancelRequest = async (req, res) => {
   }
 
   return res.status(200).json({ message: 'Request status updated to cancelled', request });
+};
+
+/**
+ * POST /api/requests/:id/share-link: the token for the link to one of the caller's own open
+ * requests (utils/shareToken.js). A request created before links existed has none, so the first
+ * call makes it. Idempotent: every later call, including one at the same moment, gets that same
+ * token. Only the requester, and only while the request is pending and inside its open hours,
+ * the same rule the public page applies before it shows anything.
+ */
+exports.getShareLink = async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const requesterId = req.user._id;
+
+    // One atomic write that sets a token only where there is none. Of two calls at once, only one
+    // can still match shareToken: { $exists: false }; the other matches nothing and reads below
+    // the token the first one wrote.
+    const created = await Request.findOneAndUpdate(
+      {
+        _id: requestId,
+        requesterId,
+        status: 'pending',
+        ...stillOpenFilter(),
+        shareToken: { $exists: false },
+      },
+      { $set: { shareToken: generateShareToken() } },
+      { returnDocument: 'after' }
+    ).select('shareToken');
+    if (created) {
+      return res.status(200).json({ shareToken: created.shareToken });
+    }
+
+    // The write matched nothing: the request already has a token, or a rule failed. Read it to
+    // tell which, as the other routes do.
+    const existing = await Request.findById(requestId).select('requesterId status closedReason createdAt shareToken');
+    if (!existing) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    // String(): requesterId is null on a fulfilled request whose requester deleted their account
+    if (String(existing.requesterId) !== String(requesterId)) {
+      return res.status(403).json({ message: 'Only the requester can share this request' });
+    }
+    if (hasExpired(existing)) {
+      // Past its hours but not swept yet: closed as expired now, as cancelRequest does, which
+      // sends the requester the usual event. Logged, never thrown: the answer is 409 either way.
+      if (existing.status === 'pending') {
+        await expireStaleRequestsLogged({ scope: { _id: existing._id } });
+      }
+      return rejectExpiredRequest(res);
+    }
+    if (existing.status !== 'pending') {
+      return res.status(409).json({ message: `Only an open request can be shared (this one has been ${existing.status})` });
+    }
+    if (!existing.shareToken) {
+      // Pending, open and theirs, yet the write above matched nothing: it changed in between
+      // (for example it was accepted and then reopened). Asking again settles it.
+      return res.status(409).json({ message: 'This request changed while its link was being made. Please try again.' });
+    }
+    return res.status(200).json({ shareToken: existing.shareToken });
+  } catch (error) {
+    console.error('Error in getShareLink:', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * GET /api/public/requests/:token, for anyone, without an account (routes/public.route.js checks
+ * the token's form first). Answers with the request's state and, only while it is open, the four
+ * fields its requester's share text already holds, plus when it closes. Never a name, an id,
+ * coordinates, declinedBy or any other date, whatever the state.
+ */
+exports.getSharedRequest = async (req, res) => {
+  try {
+    const request = await Request.findOne({ shareToken: req.params.token })
+      .select('status closedReason createdAt bloodGroup unitsNeeded hospitalName urgency')
+      .lean();
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Accepted requests never expire (utils/requestExpiry.js), so this one has a donor
+    if (request.status === 'accepted') {
+      return res.status(200).json({ state: 'donor_found' });
+    }
+    // Open: pending and inside its open hours, the rule every other read applies, whether or not
+    // a sweep has closed it yet. Not swept from here: this route stays read-only for callers
+    // without an account, and a requester's own reads close it for them.
+    if (request.status === 'pending' && !hasExpired(request)) {
+      return res.status(200).json({
+        state: 'open',
+        bloodGroup: request.bloodGroup,
+        unitsNeeded: request.unitsNeeded,
+        hospitalName: request.hospitalName,
+        urgency: request.urgency,
+        expiresAt: getRequestExpiresAt(request),
+      });
+    }
+    // Fulfilled, cancelled, or expired
+    return res.status(200).json({ state: 'closed' });
+  } catch (error) {
+    console.error('Error in getSharedRequest:', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
 };
 
 exports.updateRequestStatus = async (req, res) => {
