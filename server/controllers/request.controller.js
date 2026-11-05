@@ -1,5 +1,6 @@
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
+const Report = require('../models/report.model');
 const { io } = require('../lib/socket');
 const webpush = require('web-push');
 const {
@@ -30,6 +31,7 @@ const {
   expireStaleRequestsIfDue,
 } = require('../utils/requestExpiry');
 const { generateShareToken } = require('../utils/shareToken');
+const { findBlockedPairUserIds, isBlockedPair } = require('../utils/blocks');
 
 // Configure web-push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -51,7 +53,8 @@ const CANDIDATE_RADIUS_IN_RADIANS = (RADIUS_KM + PIN_CANDIDATE_MARGIN_KM) / EART
 
 /**
  * Geospatial query for the donors a pending request may reach, over the wider candidate radius.
- * Leaves out busy and resting donors, the requester, and every donor who declined the request.
+ * Leaves out busy and resting donors, the requester, every donor who declined the request, and
+ * every donor in a block with the requester, whichever of them made it.
  * @param {import('mongoose').Document} request - a saved Request document
  */
 const findCandidateDonors = async (request) => {
@@ -62,10 +65,15 @@ const findCandidateDonors = async (request) => {
   // isAvailable choice is true. one_active_donation_per_donor keeps this to one per donor.
   // Donors inside the minimum gap after a donation are left out the same way: those who
   // donated through the app here, those who reported an outside donation in the User filter.
+  // Blocked pairs (utils/blocks.js) are left out of the alerts, the count and the pins alike, so
+  // to a requester a donor who blocked them looks like any donor who is busy, resting or away.
   const donationGapCutoff = getDonationGapCutoff();
-  const unavailableDonorIds = await Request.distinct('matchedDonorId', {
-    $or: [{ status: 'accepted' }, inAppDonationInGapFilter(donationGapCutoff)],
-  });
+  const [unavailableDonorIds, blockedUserIds] = await Promise.all([
+    Request.distinct('matchedDonorId', {
+      $or: [{ status: 'accepted' }, inAppDonationInGapFilter(donationGapCutoff)],
+    }),
+    findBlockedPairUserIds(request.requesterId),
+  ]);
 
   // One query over the wider radius; both donor lists in createRequest are filtered from it in
   // JS, so leaving busy and resting donors out here keeps them out of the notify list AND the
@@ -73,8 +81,8 @@ const findCandidateDonors = async (request) => {
   // exact vs compatible, pushSubscription for the push, and location for the two distance checks.
   // declinedBy is always empty on a new request; a reopened one keeps the donors who said no.
   return User.find({
-    // Exclude busy or resting donors, the requester, and donors who declined
-    _id: { $nin: [...unavailableDonorIds, request.requesterId, ...request.declinedBy] },
+    // Exclude busy or resting donors, the requester, donors who declined, and blocked pairs
+    _id: { $nin: [...unavailableDonorIds, request.requesterId, ...request.declinedBy, ...blockedUserIds] },
     bloodGroup: { $in: compatibleDonorGroups },
     isAvailable: true,
     ...noOutsideDonationInGapFilter(donationGapCutoff),
@@ -278,6 +286,9 @@ exports.getIncomingRequests = async (req, res) => {
     // rejects: it logs its own failures.
     expireStaleRequestsIfDue();
 
+    // No open request from anyone in a block with this donor, whichever of them made it
+    const blockedUserIds = await findBlockedPairUserIds(donor._id);
+
     // Find pending requests nearby matching compatible blood groups, OR requests this donor has already accepted
     const rawIncomingRequests = await Request.find({
       $or: [
@@ -285,7 +296,7 @@ exports.getIncomingRequests = async (req, res) => {
           status: 'pending',
           ...stillOpenFilter(),
           bloodGroup: { $in: compatibleRecipientGroups },
-          requesterId: { $ne: donor._id },
+          requesterId: { $ne: donor._id, $nin: blockedUserIds },
           declinedBy: { $ne: donor._id },
           hospitalLocation: {
             $geoWithin: {
@@ -339,6 +350,111 @@ const withinDonorRadius = (donor) => ({
   },
 });
 
+/**
+ * How a user stands to a request, for reports and blocks (report.controller.js,
+ * block.controller.js):
+ * - 'requester': they made it;
+ * - 'donor': they are its matched donor (accepted, fulfilled, or cancelled after an accept);
+ * - 'viewer': a donor it reaches, by getIncomingRequests' rules: a compatible blood group and the
+ *   hospital within RADIUS_KM of their saved location. Whatever its status now: the list they saw
+ *   it in may be older than its last change;
+ * - null: none of these, so they had no way to see it.
+ * @param {import('mongoose').Document} request
+ * @param {import('mongoose').Document} user - req.user
+ * @returns {Promise<'requester' | 'donor' | 'viewer' | null>}
+ */
+const describeRequestRole = async (request, user) => {
+  // String(): requesterId is null on a fulfilled request whose requester deleted their account
+  if (String(request.requesterId) === String(user._id)) return 'requester';
+  if (request.matchedDonorId && String(request.matchedDonorId) === String(user._id)) return 'donor';
+  if (!isCompatibleDonor(user.bloodGroup, request.bloodGroup)) return null;
+  const isWithinRadius = await Request.exists({ _id: request._id, hospitalLocation: withinDonorRadius(user) });
+  return isWithinRadius ? 'viewer' : null;
+};
+exports.describeRequestRole = describeRequestRole;
+
+// A pending request reported by this many different users, each with an account older than the
+// request, is closed (closeRequestIfReported)
+const REPORTS_TO_CLOSE_REQUEST = 3;
+exports.REPORTS_TO_CLOSE_REQUEST = REPORTS_TO_CLOSE_REQUEST;
+
+// Tells everyone who may hold a card for a request that it has closed: its requester, with the
+// hospital's name for the popup, and every user whose incoming list it can be in by
+// getIncomingRequests' rules (compatible blood group, saved location within RADIUS_KM, no block
+// with the requester), with only its id and why. Logged, never thrown: the request is already closed.
+const announceReportedClose = async (closed) => {
+  try {
+    io.to(String(closed.requesterId)).emit('requestStatusUpdate', {
+      requestId: closed._id,
+      status: 'cancelled',
+      reason: 'reported',
+      hospitalName: closed.hospitalName,
+    });
+
+    const blockedUserIds = await findBlockedPairUserIds(closed.requesterId);
+    const possibleViewers = await User.find({
+      _id: { $nin: [closed.requesterId, ...blockedUserIds] },
+      bloodGroup: { $in: getCompatibleDonorGroups(closed.bloodGroup) },
+      location: {
+        $geoWithin: { $centerSphere: [[...closed.hospitalLocation.coordinates], RADIUS_IN_RADIANS] },
+      },
+    })
+      .select('_id')
+      .lean();
+    possibleViewers.forEach((viewer) => {
+      io.to(String(viewer._id)).emit('requestStatusUpdate', {
+        requestId: closed._id,
+        status: 'cancelled',
+        reason: 'reported',
+      });
+    });
+  } catch (error) {
+    console.error(`Closing reported request ${closed._id}: failed to tell those who see it:`, error.message);
+  }
+};
+
+/**
+ * Closes a request once REPORTS_TO_CLOSE_REQUEST different users whose accounts were created before
+ * it have reported it, if it is still pending and inside its open hours: status 'cancelled' with
+ * closedReason 'reported'. Reports from newer accounts are stored and hide the request from their
+ * reporter, but do not count: accounts made after a request was posted, to report it, cannot close
+ * it. One past its hours is left to expire instead, which keeps its "Post again". reportRequest
+ * calls this after every report, a repeat included, so a close that failed once is tried again;
+ * so does announceReopenedRequests (user.controller.js) for a request that a block or an account
+ * deletion put back to pending.
+ *
+ * Race-safe with reports sent at once: each report is written before its count runs, so the count
+ * that runs last sees all of them (the unique one_report_per_request index means each counts one
+ * user), and neither a request's createdAt nor a user's ever changes. Several counts can reach the
+ * number; the close is one conditional write, so only the first matches, and only that call sends
+ * the events. The same holds against an accept, a cancel or the expiry sweep: whichever write
+ * lands first wins.
+ * @param {import('mongoose').Types.ObjectId | string} requestId
+ * @returns {Promise<boolean>} whether this call closed it
+ */
+const closeRequestIfReported = async (requestId) => {
+  const reporterIds = await Report.distinct('reporterId', { kind: 'request', requestId });
+  if (reporterIds.length < REPORTS_TO_CLOSE_REQUEST) return false;
+  const request = await Request.findById(requestId).select('createdAt').lean();
+  if (!request) return false;
+  const countingReporters = await User.countDocuments({
+    _id: { $in: reporterIds },
+    createdAt: { $lt: request.createdAt },
+  });
+  if (countingReporters < REPORTS_TO_CLOSE_REQUEST) return false;
+
+  const closed = await Request.findOneAndUpdate(
+    { _id: requestId, status: 'pending', ...stillOpenFilter() },
+    { $set: { status: 'cancelled', closedReason: 'reported' } },
+    { returnDocument: 'after' }
+  );
+  if (!closed) return false;
+
+  await announceReportedClose(closed);
+  return true;
+};
+exports.closeRequestIfReported = closeRequestIfReported;
+
 // 403 like the other rules about the donor themselves (blood group, radius). The body carries
 // the date too, so a client can show it without parsing the message.
 const rejectInsideDonationGap = (res, nextEligibleDonationAt) =>
@@ -348,14 +464,35 @@ const rejectInsideDonationGap = (res, nextEligibleDonationAt) =>
 // dashboard reloads it and the card goes
 const rejectExpiredRequest = (res) => res.status(409).json({ message: 'This request has expired' });
 
-// Puts back to pending an accept that must not stand. The filter matches only while it is still
-// this donor's accept, so it never overwrites what happened to the request since.
-const undoAccept = async (request, donor, reason) => {
-  const undo = await Request.updateOne(
-    { _id: request._id, status: 'accepted', matchedDonorId: donor._id },
-    { $set: { status: 'pending', matchedDonorId: null } }
+// Every accept refused because the request is no longer open to this donor gets these same words:
+// accepted by someone else, cancelled, fulfilled, closed after reports, changed during the accept,
+// or a block between the donor and its requester. So a refusal never tells a donor they were
+// blocked; the donor who blocked already knows.
+const rejectUnavailableRequest = (res) => res.status(409).json({ message: 'This request is no longer available' });
+
+/**
+ * Puts back to pending a request this donor holds as accepted. The filter matches only while it is
+ * still this donor's accept, so it never overwrites what happened to the request since.
+ * asDeclined also adds the donor to declinedBy, as a decline would, so the request never reaches
+ * them again (block.controller.js, when a block ends a match).
+ * @returns {Promise<import('mongoose').Document | null>} the reopened request, or null if it no
+ * longer was this donor's accept
+ */
+const reopenAcceptedRequest = (requestId, donorId, { asDeclined = false } = {}) =>
+  Request.findOneAndUpdate(
+    { _id: requestId, status: 'accepted', matchedDonorId: donorId },
+    {
+      $set: { status: 'pending', matchedDonorId: null },
+      ...(asDeclined && { $addToSet: { declinedBy: donorId } }),
+    },
+    { returnDocument: 'after' }
   );
-  if (undo.matchedCount === 0) {
+exports.reopenAcceptedRequest = reopenAcceptedRequest;
+
+// Puts back to pending an accept that must not stand
+const undoAccept = async (request, donor, reason) => {
+  const reopened = await reopenAcceptedRequest(request._id, donor._id);
+  if (!reopened) {
     // The requester cancelled or fulfilled it, or a deletion of this donor's account put it back
     // to pending, in the milliseconds since the write
     console.warn(`acceptRequest: accept of request ${request._id} by donor ${donor._id} ${reason} was not undone: it is no longer accepted by them`);
@@ -375,6 +512,10 @@ const acceptRequest = async (req, res) => {
     return rejectInsideDonationGap(res, nextEligibleBeforeWrite);
   }
 
+  // Blocks live in their own collection, so the filter below can only leave out the requesters
+  // read here. A block made after this read is caught by the check after the write.
+  const blockedUserIds = await findBlockedPairUserIds(donor._id);
+
   // One atomic write on one document, so no transaction is needed. The donor's User is not
   // written: holding this accepted request is what makes them busy (see createRequest).
   // Every rule about the request itself lives in the filter, so if two donors accept at the
@@ -388,7 +529,7 @@ const acceptRequest = async (req, res) => {
         _id: requestId,
         status: 'pending',
         ...stillOpenFilter(),
-        requesterId: { $ne: donor._id },
+        requesterId: { $ne: donor._id, $nin: blockedUserIds },
         bloodGroup: { $in: getCompatibleRecipientGroups(donor.bloodGroup) },
         hospitalLocation: withinDonorRadius(donor),
       },
@@ -428,9 +569,8 @@ const acceptRequest = async (req, res) => {
         message: `This request is outside your ${RADIUS_KM} km donation radius`,
       });
     }
-
-    // The donor is eligible, so the request was no longer open: past its hours (whether or not a
-    // sweep has closed it yet), or no longer pending
+    // The donor is eligible, so the request was no longer open to them: past its hours (whether or
+    // not a sweep has closed it yet), no longer pending, or its requester is in a block with them
     if (hasExpired(existing)) {
       return rejectExpiredRequest(res);
     }
@@ -439,13 +579,10 @@ const acceptRequest = async (req, res) => {
     if (existing.status === 'accepted' && isAlreadyMatchedToDonor) {
       return res.status(409).json({ message: 'You have already accepted this request' });
     }
-    if (existing.status === 'accepted') {
-      return res.status(409).json({ message: 'This request has already been accepted by another donor' });
-    }
-    return res.status(409).json({ message: `This request is no longer pending (it has been ${existing.status})` });
+    return rejectUnavailableRequest(res);
   }
 
-  // Two races the reads before the write cannot see, both checked on this one re-read of the
+  // Races the reads before the write cannot see, the first two checked on this one re-read of the
   // donor. Nothing has told the requester about the accept yet, so putting the request back to
   // pending undoes it.
   const freshDonor = await User.findById(donor._id).select('lastOutsideDonationDate').lean();
@@ -473,6 +610,14 @@ const acceptRequest = async (req, res) => {
     return rejectInsideDonationGap(res, nextEligibleAfterWrite);
   }
 
+  // 3. One of the two blocked the other after the read before the write. The block's own clean-up
+  // (endMatchesAfterBlock in block.controller.js) starts only after the block is written, so if
+  // this read misses the block, that clean-up finds this accept and ends it instead.
+  if (await isBlockedPair(donor._id, request.requesterId)) {
+    await undoAccept(request, donor, 'between users in a block');
+    return rejectUnavailableRequest(res);
+  }
+
   // A cancel or fulfil can still land between our write and this emit, so re-read to avoid
   // sending the requester a stale 'accepted'. Nothing else needs undoing: the accept wrote
   // only the request, and the cancel or fulfil already changed it.
@@ -480,9 +625,7 @@ const acceptRequest = async (req, res) => {
   const isStillMatched =
     current && current.status === 'accepted' && String(current.matchedDonorId) === String(donor._id);
   if (!isStillMatched) {
-    return res.status(409).json({
-      message: `This request has already been ${current ? current.status : 'removed'}`,
-    });
+    return rejectUnavailableRequest(res);
   }
 
   // Emit status update back to the requester

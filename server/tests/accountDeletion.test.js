@@ -6,7 +6,9 @@ const { io: ioClient } = require('socket.io-client');
 // in these tests reach the same server
 require('../index');
 const { io, server } = require('../lib/socket');
+const Block = require('../models/block.model');
 const Message = require('../models/message.model');
+const Report = require('../models/report.model');
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const { computeNextEligibleDonationAt, describeDonationGap } = require('../utils/donationGap');
@@ -133,6 +135,8 @@ const readDatabase = async () =>
     users: await User.collection.find({}).sort({ _id: 1 }).toArray(),
     requests: await Request.collection.find({}).sort({ _id: 1 }).toArray(),
     messages: await Message.collection.find({}).sort({ _id: 1 }).toArray(),
+    blocks: await Block.collection.find({}).sort({ _id: 1 }).toArray(),
+    reports: await Report.collection.find({}).sort({ _id: 1 }).toArray(),
   });
 
 // forceNew: each client gets its own connection. reconnection: false so a failed test can never

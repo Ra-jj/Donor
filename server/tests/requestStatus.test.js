@@ -211,7 +211,7 @@ describe('PATCH /api/requests/:id/status', () => {
       const secondRes = await patchStatus(bloodRequest._id, secondDonor.cookie, 'accepted');
 
       expect(secondRes.statusCode).toBe(409);
-      expect(secondRes.body.message).toBe('This request has already been accepted by another donor');
+      expect(secondRes.body.message).toBe('This request is no longer available');
       expect(socket.to).not.toHaveBeenCalled();
 
       const stored = await Request.findById(bloodRequest._id);
@@ -376,7 +376,7 @@ describe('PATCH /api/requests/:id/status', () => {
 
       expect(cancelRes.statusCode).toBe(200);
       expect(acceptRes.statusCode).toBe(409);
-      expect(acceptRes.body.message).toBe('This request has already been cancelled');
+      expect(acceptRes.body.message).toBe('This request is no longer available');
       expect((await Request.findById(bloodRequest._id)).status).toBe('cancelled');
       expect((await User.findById(donor.id)).isAvailable).toBe(true);
       // The requester must not get a stale 'accepted' event; the donor still hears about the cancel

@@ -778,7 +778,7 @@ describe('the donation gap through the API', () => {
 
       expect(fulfilRes.statusCode).toBe(200);
       expect(acceptRes.statusCode).toBe(409);
-      expect(acceptRes.body.message).toBe('This request has already been fulfilled');
+      expect(acceptRes.body.message).toBe('This request is no longer available');
       const stored = await Request.findById(bloodRequest._id);
       expect(stored.status).toBe('fulfilled');
       expect(stored.matchedDonorId.toString()).toBe(donor.id);

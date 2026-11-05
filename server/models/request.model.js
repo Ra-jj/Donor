@@ -64,10 +64,12 @@ const requestSchema = new mongoose.Schema(
       default: 'pending',
     },
     // Set only on a request the server cancelled itself: 'expired' when it was still pending
-    // REQUEST_OPEN_HOURS after it was created (utils/requestExpiry.js). Absent on every other one.
+    // REQUEST_OPEN_HOURS after it was created (utils/requestExpiry.js), 'reported' when it was
+    // still pending once REPORTS_TO_CLOSE_REQUEST different users had reported it
+    // (closeRequestIfReported in request.controller.js). Absent on every other one.
     closedReason: {
       type: String,
-      enum: ['expired'],
+      enum: ['expired', 'reported'],
     },
     // Also null on a fulfilled or cancelled request whose donor deleted their account
     matchedDonorId: {

@@ -55,6 +55,47 @@ const deleteAccountLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Limit reports per user (req.user._id): of requests and of users, together. A real report is
+ * rare, so this only slows down someone filing them in bulk. Per user, as above, not per IP.
+ */
+const reportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 10,
+  keyGenerator: (req) => {
+    // protectRoute middleware guarantees req.user exists before this limiter hits
+    return req.user._id.toString();
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many reports. Please try again in an hour.',
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Limit blocks and unblocks per user (req.user._id), together. A block can end a match, and the
+ * request then goes back to nearby donors with a new alert, so blocking and unblocking in a loop
+ * must not be able to alert them again and again.
+ */
+const blockLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 20,
+  keyGenerator: (req) => {
+    // protectRoute middleware guarantees req.user exists before this limiter hits
+    return req.user._id.toString();
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many blocks or unblocks. Please try again in 15 minutes.',
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const REGISTER_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 // Deliberately loose: mobile carriers in India put many users behind one IP (CGNAT)
 const DEFAULT_REGISTER_LIMIT = 10;
@@ -121,6 +162,8 @@ module.exports = {
   loginLimiter,
   requestLimiter,
   deleteAccountLimiter,
+  reportLimiter,
+  blockLimiter,
   registerLimiter,
   publicRequestLimiter,
   resolveRegisterLimitConfig,

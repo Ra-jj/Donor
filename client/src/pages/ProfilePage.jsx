@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { axiosInstance } from '../lib/axios';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
-import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon, WarningOctagonIcon, TrashIcon, ShieldCheckIcon } from '@phosphor-icons/react';
+import { UserCircleIcon, ClockClockwiseIcon, MapTrifoldIcon, CheckCircleIcon, HourglassMediumIcon, WarningIcon, WarningOctagonIcon, TrashIcon, ShieldCheckIcon, ProhibitIcon } from '@phosphor-icons/react';
 import { PRIVACY_CONTACT_EMAIL } from '../config/privacy';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
@@ -17,6 +17,7 @@ import {
   toDateInputValue,
 } from '../lib/donationGap';
 import { isExpiredRequest } from '../lib/requestExpiry';
+import { isReportedRequest, REPORTED_NOTE } from '../lib/reportedRequest';
 import { buildRepostState } from '../lib/repostRequest';
 import { DEVICE_LOCATION_OPTIONS, describeDeviceLocationError } from '../lib/deviceLocation';
 
@@ -84,6 +85,109 @@ const warnIfOutsideDonationDuringActiveDonation = async (savedUser, previousOuts
     // The profile is already saved and confirmed, so only log it
     console.error('Error checking for an active donation:', error);
   }
+};
+
+/**
+ * The people this user blocked (GET /users/blocks), each with Unblock. The server sends a first
+ * name, the date and the block's own id, never the other person's id. Blocking happens on the
+ * dashboard (components/ReportBlockDialog.jsx); this is the only place to undo it.
+ */
+const BlockedUsersSection = () => {
+  const headingRef = useRef(null);
+  // null while loading; false when the load failed
+  const [blockedUsers, setBlockedUsers] = useState(null);
+  const [unblockingId, setUnblockingId] = useState(null);
+
+  useEffect(() => {
+    let isCurrent = true;
+    axiosInstance
+      .get('/users/blocks')
+      .then((res) => {
+        if (isCurrent) setBlockedUsers(res.data.blockedUsers);
+      })
+      .catch((error) => {
+        console.error('Error loading blocked users:', error);
+        if (isCurrent) setBlockedUsers(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  // The row and its button go, so focus moves back to the top of this part of the page
+  const removeEntry = (entry) => {
+    setBlockedUsers((prev) => prev.filter((blocked) => blocked._id !== entry._id));
+    headingRef.current?.focus();
+  };
+
+  const handleUnblock = async (entry) => {
+    setUnblockingId(entry._id);
+    try {
+      await axiosInstance.delete(`/users/blocks/${entry._id}`);
+      removeEntry(entry);
+      toast.success(`Unblocked ${entry.name}`);
+    } catch (error) {
+      // 404: already unblocked, from another window or device
+      if (error.response?.status === 404) removeEntry(entry);
+      toast.error(error.response?.data?.message || "Couldn't unblock. Please try again.");
+    } finally {
+      setUnblockingId(null);
+    }
+  };
+
+  return (
+    <section aria-labelledby="blocked-users-heading" className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-base-300">
+      <h2
+        ref={headingRef}
+        id="blocked-users-heading"
+        tabIndex={-1}
+        className="text-xl font-display font-bold mb-2 flex items-center gap-2 focus:outline-none"
+      >
+        <ProhibitIcon weight="duotone" className="w-6 h-6 text-primary shrink-0" aria-hidden="true" />
+        Blocked users
+      </h2>
+      <p className="text-sm text-base-content/70 leading-relaxed mb-5 max-w-prose">
+        You aren't matched with people you block, and they aren't told. Unblock someone to be matched with them again.
+      </p>
+
+      {blockedUsers === null ? (
+        <div className="flex justify-center p-4">
+          <span className="loading loading-spinner text-primary" aria-label="Loading blocked users"></span>
+        </div>
+      ) : blockedUsers === false ? (
+        <p role="alert" className="text-sm font-medium text-error">
+          Your blocked users couldn't be loaded. Reload the page to try again.
+        </p>
+      ) : blockedUsers.length === 0 ? (
+        <div className="text-center p-6 bg-base-200/50 rounded-2xl text-base-content/60">
+          You haven't blocked anyone.
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {blockedUsers.map((entry) => (
+            <li key={entry._id} className="bg-base-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-bold wrap-anywhere">{entry.name}</div>
+                {/* The day in India, wherever the browser is */}
+                <div className="text-sm text-base-content/60">
+                  Blocked on <span className="whitespace-nowrap">{formatIndiaDate(entry.blockedAt)}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUnblock(entry)}
+                disabled={unblockingId !== null}
+                aria-label={`Unblock ${entry.name}`}
+                className="btn btn-sm btn-outline rounded-xl shrink-0 min-h-11"
+              >
+                {unblockingId === entry._id ? <span className="loading loading-spinner loading-xs" aria-hidden="true"></span> : 'Unblock'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 };
 
 const ProfilePage = () => {
@@ -415,6 +519,7 @@ const ProfilePage = () => {
                           {req.status === 'fulfilled' && <>Donated by {req.matchedDonorId?.name || 'Deleted user'} </>}
                           <span className="whitespace-nowrap">{req.status === 'fulfilled' && '• '}{formatIndiaDate(req.createdAt)}</span>
                         </div>
+                        {isReportedRequest(req) && <div className="text-sm text-base-content/60">{REPORTED_NOTE}</div>}
                       </div>
                       {isExpiredRequest(req) ? (
                         // Opens the New Request form filled in with this request's details, to send again
@@ -430,7 +535,7 @@ const ProfilePage = () => {
                         </div>
                       ) : (
                         <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>
-                          {req.status}
+                          {isReportedRequest(req) ? 'closed' : req.status}
                         </div>
                       )}
                     </div>
@@ -441,6 +546,8 @@ const ProfilePage = () => {
           </div>
         )}
       </div>
+
+      <BlockedUsersSection />
 
       <section aria-labelledby="privacy-heading" className="bg-base-100 rounded-3xl p-6 md:p-8 shadow-sm border border-base-300">
         <h2 id="privacy-heading" className="text-xl font-display font-bold mb-2 flex items-center gap-2">

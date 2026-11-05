@@ -11,6 +11,7 @@ import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
 import MapErrorBoundary from '../components/MapErrorBoundary';
 import ShareRequestButtons from '../components/ShareRequestButtons';
+import ReportBlockDialog from '../components/ReportBlockDialog';
 import { isInDonationGap, formatIndiaDate } from '../lib/donationGap';
 import {
   getClosesAtMs,
@@ -21,11 +22,31 @@ import {
 } from '../lib/requestExpiry';
 import { announceExpiredRequest, announceMissedExpiredRequests } from '../lib/expiredRequestPopups';
 import { buildRepostState } from '../lib/repostRequest';
-import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon } from '@phosphor-icons/react';
+import { isReportedRequest, REPORTED_NOTE, describeReportedRequest } from '../lib/reportedRequest';
+import { PlusIcon, BellRingingIcon, ClockClockwiseIcon, ChecksIcon, XCircleIcon, HandHeartIcon, StarIcon, CheckCircleIcon, DotsThreeIcon } from '@phosphor-icons/react';
 
 const DonorMap = lazy(loadDonorMap);
 
+// The small button that opens ReportBlockDialog, on an incoming card and in the chat header. Kept
+// quiet on purpose: most people never need it. It looks 32 px wide, but its ::after reaches 8 px
+// past its 1 px border on every side, so a finger has a 46 px target.
+const ReportBlockButton = ({ onOpen }) => (
+  <button
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onOpen(); }}
+    aria-label="Report or block"
+    aria-haspopup="dialog"
+    title="Report or block"
+    className="btn btn-ghost btn-sm btn-circle text-base-content/60 relative after:absolute after:-inset-2"
+  >
+    <DotsThreeIcon weight="bold" className="w-5 h-5" aria-hidden="true" />
+  </button>
+);
+
 const MINUTE_MS = 60 * 1000;
+// How long after the lists reload a card that left them is gone from the page (its exit animation
+// takes 0.3 s)
+const CARD_EXIT_MS = 500;
 // setTimeout fires at once for any longer delay
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
@@ -140,6 +161,19 @@ const DashboardPage = () => {
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingNote, setRatingNote] = useState('');
   const [ratingLoading, setRatingLoading] = useState(false);
+
+  // The request ReportBlockDialog is open for, and the user's place on it, or null while it is closed
+  const [reportBlockTarget, setReportBlockTarget] = useState(null);
+
+  // A report or block can take away the card or chat whose button opened the dialog, and focus would
+  // then fall to the page itself. It goes to the open list's heading instead.
+  const incomingHeadingRef = useRef(null);
+  const mineHeadingRef = useRef(null);
+  const focusListHeadingIfLost = () => {
+    const focused = document.activeElement;
+    if (focused && focused !== document.body && focused.isConnected) return;
+    (activeTab === 'incoming' ? incomingHeadingRef : mineHeadingRef).current?.focus();
+  };
 
   const enablePushNotifications = async () => {
     try {
@@ -281,6 +315,9 @@ const DashboardPage = () => {
     const handleStatusUpdate = (data) => {
       // Closed by the server: still pending when its open hours ran out. Only its requester is told.
       const hasExpired = data.status === 'cancelled' && data.reason === 'expired';
+      // Closed by the server after reports from several users while it was open. Its requester is
+      // told with the hospital's name; donors who could see it get only its id, and their card goes.
+      const wasReported = data.status === 'cancelled' && data.reason === 'reported';
 
       // A late 'accepted' for a request that has already ended here must not revive it
       if (data.status === 'accepted') {
@@ -305,6 +342,21 @@ const DashboardPage = () => {
           data.requestId,
           data.hospitalName || localRequest?.hospitalName
         );
+      } else if (wasReported) {
+        const localRequest = myRequestsRef.current.find((req) => req._id === data.requestId);
+        if (localRequest) {
+          toast.error(describeReportedRequest(data.hospitalName || localRequest.hospitalName), {
+            id: `reported-${data.requestId}`,
+            duration: 10000,
+            className: 'wrap-anywhere',
+          });
+        }
+      } else if (data.reason === 'blocked') {
+        // This user's own block, made in another window or on another device: the lists below
+        // change, and there is nothing to tell them
+      } else if (data.status === 'cancelled' && data.reason === 'match_ended') {
+        // The requester ended the match. Said without a reason, as the server sends none.
+        toast.error("This request is no longer available to you. You're free to accept another.", { duration: 6000 });
       } else if (data.status === 'cancelled' && data.reason === 'account_deleted') {
         // The server sends no name for a deleted account
         toast.error('The requester deleted their account. This request is cancelled.', { duration: 6000 });
@@ -313,16 +365,19 @@ const DashboardPage = () => {
       } else if (data.status === 'pending' && data.reason === 'account_deleted') {
         // Sent only when the matched donor deletes their account (deleteAccount on the server)
         toast.error('Your donor deleted their account. Your request is open to donors again.', { duration: 6000 });
+      } else if (data.status === 'pending' && data.reason === 'donor_withdrew') {
+        // The donor ended the match. Said without a reason, as the server sends none.
+        toast.error('Your donor can no longer help. Your request is open to donors again.', { duration: 6000 });
       }
       
-      // Update my requests list to reflect the new status. Back to pending, or expired, means no donor.
+      // Update my requests list to reflect the new status. Back to pending, expired or reported means no donor.
       setMyRequests((prev) => prev.map(req => 
         req._id === data.requestId
           ? {
             ...req,
             status: data.status,
-            matchedDonorId: data.status === 'pending' || hasExpired ? null : 'temp_id',
-            closedReason: hasExpired ? 'expired' : req.closedReason,
+            matchedDonorId: data.status === 'pending' || hasExpired || wasReported ? null : 'temp_id',
+            closedReason: hasExpired ? 'expired' : wasReported ? 'reported' : req.closedReason,
           }
           : req
       ));
@@ -337,8 +392,9 @@ const DashboardPage = () => {
 
       // Cancel and fulfil events only reach the matched donor, and a donor holds at most one
       // accepted request, so either one means this donor is no longer busy. An expiry goes to the
-      // requester instead, and says nothing about their own donations.
-      if ((data.status === 'cancelled' && !hasExpired) || data.status === 'fulfilled') {
+      // requester instead, and a close after reports to donors who only saw the request open: neither
+      // says anything about their own donations.
+      if ((data.status === 'cancelled' && !hasExpired && !wasReported) || data.status === 'fulfilled') {
         setHasActiveDonation(false);
       }
 
@@ -614,7 +670,7 @@ const DashboardPage = () => {
                 transition={{ duration: 0.25 }}
                 className="space-y-4"
               >
-                <h2 className="text-xl font-bold mb-4">Requests Needing Your Help</h2>
+                <h2 ref={incomingHeadingRef} tabIndex={-1} className="text-xl font-bold mb-4 focus:outline-none">Requests Needing Your Help</h2>
                 {isResting && (
                   <div id="donation-gap-notice" role="status" className="bg-success/10 border border-success/20 rounded-2xl p-4 text-sm font-medium text-base-content flex items-start gap-3">
                     <HandHeartIcon weight="duotone" className="w-6 h-6 text-success shrink-0" />
@@ -703,6 +759,9 @@ const DashboardPage = () => {
                                     <span className="badge badge-info badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-info/20">Compatible Match</span>
                                   ) : null}
                                   <UrgencyBadge urgency={req.urgency} />
+                                  {req.status === 'pending' && (
+                                    <ReportBlockButton onOpen={() => setReportBlockTarget({ requestId: req._id, role: 'viewer' })} />
+                                  )}
                                 </div>
                               </div>
                               <p className="text-sm text-base-content/70">
@@ -757,7 +816,7 @@ const DashboardPage = () => {
                 transition={{ duration: 0.25 }}
                 className="space-y-4"
               >
-                <h2 className="text-xl font-bold mb-4">My Emergency Requests</h2>
+                <h2 ref={mineHeadingRef} tabIndex={-1} className="text-xl font-bold mb-4 focus:outline-none">My Emergency Requests</h2>
                 {myRequests.length === 0 ? (
                   <div className="text-center p-8 bg-base-100 rounded-xl border border-base-300 text-base-content/60">
                     You haven't made any blood requests.
@@ -785,7 +844,7 @@ const DashboardPage = () => {
                               req.status === 'accepted' ? 'badge-success text-white' : 
                               req.status === 'fulfilled' ? 'badge-info text-white' : ''
                             }`}>
-                              {isExpiredRequest(req) ? 'EXPIRED' : req.status.toUpperCase()}
+                              {isExpiredRequest(req) ? 'EXPIRED' : isReportedRequest(req) ? 'CLOSED' : req.status.toUpperCase()}
                             </div>
                           </div>
                           <p className="text-sm text-base-content/70 mt-2">
@@ -806,6 +865,11 @@ const DashboardPage = () => {
                                 Post again
                               </Link>
                             </div>
+                          )}
+
+                          {/* Closed by the server after reports. No "Post again", and nothing about who reported it. */}
+                          {isReportedRequest(req) && (
+                            <p className="mt-3 text-sm text-base-content/70">{REPORTED_NOTE}</p>
                           )}
 
                           {/* Still without a donor, so the requester can ask people outside the app too */}
@@ -948,7 +1012,19 @@ const DashboardPage = () => {
                     </div>
                     {backToRequestsButton}
                   </div>
-                  <ChatWindow requestId={activeChatRequest._id} currentUserId={authUser._id} />
+                  <ChatWindow
+                    requestId={activeChatRequest._id}
+                    currentUserId={authUser._id}
+                    headerAction={
+                      <ReportBlockButton
+                        onOpen={() => setReportBlockTarget({
+                          requestId: activeChatRequest._id,
+                          // The incoming list holds the requests this user donates to
+                          role: activeTab === 'incoming' ? 'donor' : 'requester',
+                        })}
+                      />
+                    }
+                  />
                 </motion.div>
               );
             }
@@ -971,6 +1047,21 @@ const DashboardPage = () => {
           })()}
         </div>
       </div>
+
+      {reportBlockTarget && (
+        <ReportBlockDialog
+          requestId={reportBlockTarget.requestId}
+          role={reportBlockTarget.role}
+          onClose={() => {
+            setReportBlockTarget(null);
+            // The dialog gives focus back to its button, unless that button has already gone
+            setTimeout(focusListHeadingIfLost, 0);
+          }}
+          onChanged={() =>
+            fetchDashboardData({ silent: true }).then(() => setTimeout(focusListHeadingIfLost, CARD_EXIT_MS))
+          }
+        />
+      )}
     </div>
   );
 };

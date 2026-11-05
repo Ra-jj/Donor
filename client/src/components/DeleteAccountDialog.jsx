@@ -74,8 +74,8 @@ const DeleteAccountDialog = ({ onClose }) => {
           <div id="delete-account-summary" className="space-y-3 text-sm text-base-content/80 leading-relaxed">
             <p className="font-semibold text-base-content">This can't be undone.</p>
             <p>
-              Your profile, email, location, push notifications and chat messages are erased, along with every request
-              of yours that wasn't fulfilled.
+              Your profile, email, location, push notifications, chat messages, blocks and reports are erased, along
+              with every request of yours that wasn't fulfilled.
             </p>
             <p>
               Completed donations stay in the other person's history, shown as "Deleted user". If you accepted a

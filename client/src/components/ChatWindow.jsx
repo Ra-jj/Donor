@@ -5,7 +5,8 @@ import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
 import { PaperPlaneRightIcon, ChatCircleDotsIcon } from '@phosphor-icons/react';
 
-const ChatWindow = ({ requestId, currentUserId }) => {
+// headerAction: an optional control shown at the right of the header (the dashboard's report and block button)
+const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -147,7 +148,8 @@ const ChatWindow = ({ requestId, currentUserId }) => {
         <div className="bg-primary/20 text-primary p-2 rounded-full">
           <ChatCircleDotsIcon weight="fill" className="w-6 h-6" />
         </div>
-        <span className="font-display text-lg tracking-tight">Coordination Chat</span>
+        <span className="font-display text-lg tracking-tight min-w-0 truncate">Coordination Chat</span>
+        {headerAction && <div className="ml-auto shrink-0">{headerAction}</div>}
       </div>
 
       {/* Messages Area */}

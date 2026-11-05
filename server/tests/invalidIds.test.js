@@ -35,6 +35,9 @@ const ID_ROUTES = [
   { name: 'POST /api/requests/:id/rate', method: 'post', path: (id) => `/api/requests/${id}/rate`, body: { rating: 5 } },
   { name: 'GET /api/messages/:requestId', method: 'get', path: (id) => `/api/messages/${id}`, body: undefined },
   { name: 'POST /api/messages/send/:requestId', method: 'post', path: (id) => `/api/messages/send/${id}`, body: { text: 'Hello' } },
+  { name: 'POST /api/requests/:id/report', method: 'post', path: (id) => `/api/requests/${id}/report`, body: { reason: 'spam' } },
+  { name: 'POST /api/requests/:id/report-user', method: 'post', path: (id) => `/api/requests/${id}/report-user`, body: { reason: 'spam' } },
+  { name: 'POST /api/requests/:id/block', method: 'post', path: (id) => `/api/requests/${id}/block`, body: undefined },
 ];
 
 const MALFORMED_IDS = ['not-an-id', '12345', 'zzzzzzzzzzzzzzzzzzzzzzzz'];
