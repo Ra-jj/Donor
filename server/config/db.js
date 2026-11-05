@@ -13,6 +13,16 @@ const connectDB = async () => {
     } catch (err) {
       console.error(`requests index build failed (${err.codeName || err.code}): ${err.message}. List donors with more than one accepted request: db.requests.aggregate([{ $match: { status: 'accepted' } }, { $group: { _id: '$matchedDonorId', n: { $sum: 1 } } }, { $match: { n: { $gt: 1 } } }])`);
     }
+
+    // The same for the unique indexes behind one report per person (models/report.model.js) and
+    // one block per pair (models/block.model.js)
+    for (const Model of [require('../models/report.model'), require('../models/block.model')]) {
+      try {
+        await Model.init();
+      } catch (err) {
+        console.error(`${Model.collection.collectionName} index build failed (${err.codeName || err.code}): ${err.message}. List its indexes: db.${Model.collection.collectionName}.getIndexes()`);
+      }
+    }
   } catch (error) {
     console.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);

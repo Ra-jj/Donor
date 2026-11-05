@@ -3,12 +3,14 @@ const mongoose = require('mongoose');
 const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const Message = require('../models/message.model');
+const Block = require('../models/block.model');
+const Report = require('../models/report.model');
 const { io } = require('../lib/socket');
 const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
 const { withDonationEligibility } = require('../utils/donationGap');
 const { buildPrivacyConsentUpdate, privacyConsentMissingFilter } = require('../utils/privacyConsent');
 const { hasExpired, expireStaleRequests, expireRequesterStaleRequests } = require('../utils/requestExpiry');
-const { notifyNearbyDonors } = require('./request.controller');
+const { notifyNearbyDonors, closeRequestIfReported } = require('./request.controller');
 
 exports.getStats = async (req, res) => {
   try {
@@ -163,6 +165,8 @@ class AccountAlreadyDeletedError extends Error {}
  *   Fulfilled and cancelled ones keep everything except matchedDonorId, and a fulfilled one also
  *   loses its rating note: the requester wrote it to and about this donor, so it is their data too.
  * - Their id is pulled from every declinedBy, and every message they sent or received is deleted.
+ * - Every block they made or that names them is deleted, and so is every report they made or that
+ *   is about them (a request of theirs, or them as a user).
  *
  * Runs inside the deletion transaction (with its session), and once more after the commit
  * without one (see deleteAccount).
@@ -217,6 +221,11 @@ const eraseUserData = async (userId, session) => {
     { session }
   );
 
+  // Their blocks and reports too, both ways. A report about them goes as well: it is about someone
+  // who asked to be erased, and its note can say who they are.
+  await Block.deleteMany({ $or: [{ blockerId: userId }, { blockedId: userId }] }, { session });
+  await Report.deleteMany({ $or: [{ reporterId: userId }, { reportedUserId: userId }] }, { session });
+
   return {
     // The donor of an accepted request that was just deleted
     donorsOfCancelledRequests: removedRequests
@@ -254,13 +263,13 @@ const eraseUserInTransaction = (userId) =>
 
 const NO_NOTIFICATIONS = { donorsOfCancelledRequests: [], requestersOfReopenedRequests: [] };
 
-// A request, accept, decline or message this user wrote after the transaction's reads is not in
-// its snapshot, so it survives the commit. createRequest, acceptRequest, declineRequest and
-// sendMessage each check that their user still exists right after writing, and undo the write if
-// not; but a check that ran before the commit still found the user. Every read from here on sees
-// the commit, so a second pass over the same steps removes whatever those writes left. No
-// session: the account is already gone, and each step stands on its own. A failure is logged,
-// never a 500.
+// A request, accept, decline, message, block or report this user wrote after the transaction's
+// reads is not in its snapshot, so it survives the commit. createRequest, acceptRequest,
+// declineRequest, sendMessage, the block and the report routes each check that their user still
+// exists right after writing, and undo the write if not; but a check that ran before the commit
+// still found the user. Every read from here on sees the commit, so a second pass over the same
+// steps removes whatever those writes left. No session: the account is already gone, and each
+// step stands on its own. A failure is logged, never a 500.
 const sweepAfterCommit = async (userId) => {
   try {
     return await eraseUserData(userId);
@@ -333,12 +342,18 @@ const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, re
 // requester cancelled it. Runs after the response, like createRequest's alerts, and only logs.
 // Its open hours still count from when it was created (utils/requestExpiry.js), so one that is
 // already past them is closed now, which tells its requester, and no donor is alerted about it.
-const announceReopenedRequests = async (requestersOfReopenedRequests) => {
+// One that already has enough reports to close (closeRequestIfReported, e.g. reports made while it
+// was accepted) is closed the same way, instead of going back to nearby donors.
+// Also used when a block ends a match (block.controller.js); logLabel names the caller in the log.
+const announceReopenedRequests = async (requestersOfReopenedRequests, logLabel = 'deleteAccount') => {
   for (const { requestId } of requestersOfReopenedRequests) {
     try {
       const reopenedRequest = await Request.findOne({ _id: requestId, status: 'pending' });
       if (reopenedRequest && hasExpired(reopenedRequest)) {
         await expireStaleRequests({ scope: { _id: reopenedRequest._id } });
+        continue;
+      }
+      if (reopenedRequest && (await closeRequestIfReported(reopenedRequest._id))) {
         continue;
       }
       const requester = reopenedRequest
@@ -348,10 +363,11 @@ const announceReopenedRequests = async (requestersOfReopenedRequests) => {
         await notifyNearbyDonors(reopenedRequest, requester.name);
       }
     } catch (error) {
-      console.error(`deleteAccount: failed to alert donors near reopened request ${requestId}:`, error.message);
+      console.error(`${logLabel}: failed to alert donors near reopened request ${requestId}:`, error.message);
     }
   }
 };
+exports.announceReopenedRequests = announceReopenedRequests;
 
 exports.deleteAccount = async (req, res) => {
   try {

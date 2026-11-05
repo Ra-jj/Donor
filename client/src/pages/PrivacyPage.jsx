@@ -91,6 +91,15 @@ const PrivacyPage = () => (
             after a donation.
           </Item>
           <Item lead="Chat messages:">the text, who sent it to whom, for which request, and when.</Item>
+          <Item lead="Reports you make:">
+            if you report a request, you, the request and its requester; if you report a person, you, them and the
+            request you were matched on. Either way, the reason you picked, your optional note of up to 300 characters,
+            and the date.
+          </Item>
+          <Item lead="Reports about you:">
+            if someone reports you or a request of yours: the reason and note they gave, and the request.
+          </Item>
+          <Item lead="Blocks:">who you blocked, and when.</Item>
           <Item lead="Your consent:">
             each version of this notice you agreed to and when, and when you confirmed you are 18 or older.
           </Item>
@@ -132,6 +141,10 @@ const PrivacyPage = () => (
             Your IP address, held for a short time, slows down automated sign-ups, password guessing and attempts to
             guess shared request links. Your consent record shows what you agreed to, and when.
           </Item>
+          <Item lead="Reports and blocks.">
+            Reports help Raj, who runs Donor, find fake requests and people who misuse the app, and close an open request
+            that 3 people who joined before it was posted have reported. Blocks let you keep away from someone.
+          </Item>
         </ul>
       </NoticeSection>
 
@@ -152,7 +165,8 @@ const PrivacyPage = () => (
             they turned notifications on. Until the request is accepted, cancelled or fulfilled, it is also listed for
             every signed-in user whose saved blood group is compatible and whose saved location is within 15 km. Donor
             does not check anyone's blood group or location, and users can change both in Profile, so treat an open
-            request as visible to anyone with a Donor account. Nobody is sent your email or your home location.
+            request as visible to anyone with a Donor account. Nobody is sent your email or your home location. None of
+            this reaches anyone in a block with you (see Blocks, below).
           </Item>
           <Item lead="If you share a request,">
             anyone with its link can see the blood group, units, hospital name, urgency and closing time while it is
@@ -173,9 +187,23 @@ const PrivacyPage = () => (
           <Item lead="After a donation,">
             you see each other's names in your histories, and the donor sees the rating and note you gave.
           </Item>
+          <Item lead="Reports">
+            are seen only by Raj, who runs Donor, in the database. The app shows them to no one, and nobody is told who
+            reported them. An open request you report is hidden from you. When 3 different people whose accounts existed
+            before a request was posted have reported it, Donor closes it if it is still open, and its requester sees
+            only that it was closed after reports from other users. Reports from newer accounts are kept, but don't count
+            toward the 3. Reporting a person changes nothing for them in the app.
+          </Item>
+          <Item lead="Blocks">
+            are seen only by the person who blocked, in Profile, and by Raj in the database. The person you block isn't
+            told. From then on, neither of you is sent the other's requests, alerts or push notifications, sees the
+            other's open requests on their dashboard, is counted or shown on the other's map, or can accept the
+            other's requests. A donation the two of you had agreed on is called off, and its chat ends. A block covers
+            only that one account.
+          </Item>
           <Item lead="Raj, who runs Donor,">
-            can access the database, including chat messages, when needed to run or fix the service. Messages travel
-            over HTTPS but are not end-to-end encrypted.
+            can access the database, including chat messages, reports and blocks, when needed to run or fix the
+            service. Messages travel over HTTPS but are not end-to-end encrypted.
           </Item>
         </ul>
         <p>We don't sell your data or show ads.</p>
@@ -222,6 +250,10 @@ const PrivacyPage = () => (
             the record of requests you declined, and your place as donor on cancelled requests. An accepted request
             where you were the donor goes back to open for its requester.
           </li>
+          <li>
+            every block you made and every block of you, every report you made, and every report about you or your
+            requests.
+          </li>
         </ul>
         <ul className={itemsClassName}>
           <Item lead="Finished donations are kept, without your name.">
@@ -233,6 +265,11 @@ const PrivacyPage = () => (
             stay stored after a request ends, even though the app no longer shows them, until you or the other person
             deletes their account.
           </Item>
+          <Item lead="Reports">
+            are kept until the person who made one, or the person it is about, deletes their account. A report of a
+            request is about its requester.
+          </Item>
+          <Item lead="Blocks">are kept until you unblock, or until either of you deletes their account.</Item>
           <Item lead="Server logs.">
             Our server writes short technical logs, such as errors. They usually hold only internal IDs, but a rare error
             can include an email address. Render keeps these logs under its own rules.
@@ -253,6 +290,10 @@ const PrivacyPage = () => (
           <Item lead="Turn notifications off.">
             Donor asks for permission only when you tap Enable Now on the dashboard. To turn notifications off, block
             them for this site in your browser or phone settings. There is no switch for this in the app.
+          </Item>
+          <Item lead="Report or block someone">
+            with the three-dot button (Report or block) on an incoming request, or in a chat. See who you blocked, and
+            unblock them, in <Link to="/profile" className="font-semibold text-primary underline">Profile</Link>.
           </Item>
           <Item lead="Edit your details.">
             Change your name, blood group, location, availability and outside donation date in Profile. Your email

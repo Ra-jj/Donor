@@ -11,6 +11,7 @@ import MapErrorBoundary from '../components/MapErrorBoundary';
 import HospitalLocationField, { HOSPITAL_SEARCH_INPUT_ID } from '../components/HospitalLocationField';
 import ShareRequestButtons from '../components/ShareRequestButtons';
 import { isExpiredRequest, describeExpiredRequest } from '../lib/requestExpiry';
+import { isReportedRequest, describeReportedRequest } from '../lib/reportedRequest';
 import { markExpiredRequestSeen } from '../lib/expiredRequestPopups';
 import { MAX_HOSPITAL_NAME_LENGTH, fitHospitalName } from '../lib/hospitalName';
 import { readRepostDraft } from '../lib/repostRequest';
@@ -68,7 +69,8 @@ const CreateRequestPage = () => {
     const socket = getSocket();
     if (!createdRequestId || !socket) return;
 
-    // closedReason is 'expired' only on a request the server closed after its open hours
+    // closedReason is set only on a request the server closed itself: 'expired' after its open
+    // hours, 'reported' after reports from other users
     const setCreatedRequestStatus = (status, closedReason) => {
       if (closedReason === 'expired') markExpiredRequestSeen(useAuthStore.getState().authUser?._id, createdRequestId);
       setSuccessData((prev) => (prev ? { ...prev, request: { ...prev.request, status, closedReason } } : prev));
@@ -76,7 +78,8 @@ const CreateRequestPage = () => {
 
     const handleStatusUpdate = (data) => {
       if (String(data.requestId) !== String(createdRequestId)) return;
-      setCreatedRequestStatus(data.status, data.status === 'cancelled' && data.reason === 'expired' ? 'expired' : undefined);
+      const isClosedByServer = data.status === 'cancelled' && ['expired', 'reported'].includes(data.reason);
+      setCreatedRequestStatus(data.status, isClosedByServer ? data.reason : undefined);
     };
 
     // Events sent while the socket was down are not replayed, so a reconnect reads the request's
@@ -228,6 +231,12 @@ const CreateRequestPage = () => {
                     Post again
                   </button>
                 </div>
+              )}
+              {/* Closed after reports: said here, and nothing about who reported it */}
+              {isReportedRequest(successData.request) && (
+                <p className="mt-8 bg-base-200 border border-base-300 rounded-2xl p-4 text-sm font-medium text-base-content text-center wrap-anywhere">
+                  {describeReportedRequest(successData.request.hospitalName)}
+                </p>
               )}
             </div>
 

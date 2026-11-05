@@ -10,5 +10,5 @@ export const PRIVACY_CONTACT_EMAIL = 'donor@example.com';
 // change to the notice text gets a new version here and there, and a new date below. Versions are
 // only ever compared for equality, never read as dates, so a second change on the same day gets a
 // suffix (2026-10-01.2).
-export const PRIVACY_NOTICE_VERSION = '2026-11-05';
-export const PRIVACY_NOTICE_LAST_UPDATED = '5 November 2026';
+export const PRIVACY_NOTICE_VERSION = '2026-11-06';
+export const PRIVACY_NOTICE_LAST_UPDATED = '6 November 2026';

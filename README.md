@@ -13,6 +13,7 @@ A real-time web application designed to connect people in need of critical suppl
 - **Coordination Chat:** Real-time messaging between the requester and the matched donor while a request is accepted.
 - **Fulfillment & Ratings Lifecycle:** Requesters mark an accepted request as fulfilled once the donation is done, and can rate the donor from 1 to 5 stars.
 - **User Profiles & History:** Users can see their impact stats (donations, average rating) and their past requests and donations.
+- **Report & Block:** Donors can report a fake or abusive request, and the requester and matched donor can report each other. A pending request reported by 3 different users whose accounts are older than it closes on its own; reports are only stored, for the owner to review in the database, and nobody is told who reported them. Anyone can block the other person on a request or in a chat: the two are never matched again in either direction (no alerts, no listings, no accepts), a match between them ends, and the blocked person isn't told. Blocks are listed in Profile, with Unblock.
 - **Account Deletion:** Users can delete their account from Profile, confirmed with their password. The deletion happens at once, in a single transaction. Finished donations stay in the other person's history as "Deleted user"; everything else is erased, and every other session is signed out.
 - **Privacy Notice & Consent:** A plain-language notice at `/privacy`, written to India's DPDP Act 2023 / DPDP Rules 2025. Sign-up has separate, unticked "I agree" and "I am 18 or older" checkboxes. Users who agreed to an older version are asked again, and every agreement is recorded with its version and time.
 - **Custom UI & Dark Mode:** Glassmorphism, Motion animations, Phosphor Icons, and a dark mode preference that persists via a cookie.
@@ -100,12 +101,13 @@ npm run dev
 - The backend API will start on `http://localhost:8000`
 
 ### 4. Run Tests
-The backend has about 300 Jest + Supertest tests, which run against an in-memory MongoDB replica set (so transactions work). They cover:
+The backend has about 440 Jest + Supertest tests, which run against an in-memory MongoDB replica set (so transactions work). They cover:
 - authentication and rate limits;
 - blood compatibility and the request lifecycle (including races between accept, cancel and fulfil);
 - the 120-day donation gap;
 - what nearby users are allowed to see;
 - account deletion;
+- reports and blocks;
 - privacy consent;
 - socket authentication and security headers.
 
