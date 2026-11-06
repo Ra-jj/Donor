@@ -107,6 +107,33 @@ const findNextEligibleDonationAt = async (
 };
 
 /**
+ * The donor's most recent donation, or null if they have none: the later of their latest
+ * fulfilled Request as its donor and lastOutsideDonationDate, the same two sources as
+ * findNextEligibleDonationAt, with no cutoff. For the donation reminder sweep
+ * (utils/donationReminders.js), which needs the moment a gap ended, after findNextEligibleDonationAt
+ * has started returning null for it. Uses the same { matchedDonorId, status, fulfilledAt } index.
+ * @param {import('mongoose').Types.ObjectId|string} donorId
+ * @param {Date|null|undefined} lastOutsideDonationDate - the donor's stored field, read fresh by the caller
+ * @returns {Promise<Date|null>}
+ */
+const findLatestDonationAt = async (donorId, lastOutsideDonationDate) => {
+  // $type: a fulfilled request without fulfilledAt has no date to count from (see inAppDonationInGapFilter)
+  const latestInAppDonation = await Request.findOne({
+    matchedDonorId: donorId,
+    status: 'fulfilled',
+    fulfilledAt: { $type: 'date' },
+  })
+    .sort({ fulfilledAt: -1 })
+    .select('fulfilledAt')
+    .lean();
+
+  const donations = [];
+  if (latestInAppDonation) donations.push(latestInAppDonation.fulfilledAt.getTime());
+  if (isValidDate(lastOutsideDonationDate)) donations.push(lastOutsideDonationDate.getTime());
+  return donations.length === 0 ? null : new Date(Math.max(...donations));
+};
+
+/**
  * A date as the donor reads it in India, e.g. "1 May 2026".
  * @param {Date} date
  * @returns {string}
@@ -125,7 +152,8 @@ const describeDonationGap = (nextEligibleDonationAt) =>
  * The user as they receive their own profile (register, login, check, profile update, privacy
  * consent): no password, plus nextEligibleDonationAt (an ISO instant, 00:00 IST of the first day
  * they may donate, or null), plus privacyConsent and needsPrivacyConsent (utils/privacyConsent.js).
- * Without privacyConsentHistory: it is kept as proof of consent, and no screen uses it.
+ * Without privacyConsentHistory: it is kept as proof of consent, and no screen uses it. Without
+ * donationReminderSentFor either, which only the reminder sweep reads (utils/donationReminders.js).
  * Only for the signed-in user themselves, never for another user.
  * @param {import('mongoose').Document} userDocument
  * @returns {Promise<object>}
@@ -134,6 +162,7 @@ const withDonationEligibility = async (userDocument) => {
   const user = userDocument.toObject();
   delete user.password;
   delete user.privacyConsentHistory;
+  delete user.donationReminderSentFor;
   Object.assign(user, describePrivacyConsent(userDocument));
   user.nextEligibleDonationAt = await findNextEligibleDonationAt(userDocument._id, userDocument.lastOutsideDonationDate);
   return user;
@@ -147,6 +176,9 @@ module.exports = {
   inAppDonationInGapFilter,
   noOutsideDonationInGapFilter,
   findNextEligibleDonationAt,
+  findLatestDonationAt,
+  toIndiaDayNumber,
+  indiaDayStartMs,
   formatIndiaDate,
   describeDonationGap,
   withDonationEligibility,

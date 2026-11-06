@@ -400,7 +400,7 @@ const ProfilePage = () => {
               <div>
                 <span className="label-text font-bold text-base block mb-1">Available to donate (notify me of nearby requests)</span>
                 <span className="label-text-alt text-base-content/60 leading-relaxed block">
-                  Your choice. Turn this off to stop new request alerts. While you have an active donation, you get no new alerts either way.
+                  Your choice. Turn this off to stop new request alerts and donation reminders. While you have an active donation, you get no new alerts either way.
                 </span>
               </div>
             </label>

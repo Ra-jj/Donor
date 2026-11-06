@@ -4,6 +4,7 @@ const generateTokenAndSetCookie = require('../utils/generateToken');
 const { AUTH_COOKIE_NAME, getAuthCookieOptions } = require('../utils/authCookie');
 const { withDonationEligibility } = require('../utils/donationGap');
 const { buildSignUpPrivacyConsentFields } = require('../utils/privacyConsent');
+const { sendDonationRemindersIfDue } = require('../utils/donationReminders');
 
 const EMAIL_TAKEN_MESSAGE = 'Email is already registered.';
 
@@ -133,6 +134,11 @@ exports.logout = (req, res) => {
 
 exports.checkAuth = async (req, res) => {
   try {
+    // Every page load of a signed-in user comes here, which makes it the server's surest sign of
+    // daytime use after a wake (utils/donationReminders.js). Throttled, and not awaited: this
+    // answer never waits for the sweep, and the sweep never rejects (it logs its own failures).
+    sendDonationRemindersIfDue();
+
     // req.user is attached by the protectRoute middleware (without the password). The client's
     // authUser comes from here, so it also carries when this donor may donate again.
     res.status(200).json({ user: await withDonationEligibility(req.user) });

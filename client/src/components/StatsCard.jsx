@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMotionValue, animate } from 'motion/react';
 import { HeartbeatIcon, StarIcon } from '@phosphor-icons/react';
+import DonationBadges from './DonationBadges';
 
 const AnimatedCounter = ({ from = 0, to, duration = 2, format = (v) => v }) => {
   const count = useMotionValue(from);
@@ -32,7 +33,9 @@ const StatsCard = ({ donorStats, requesterStats }) => {
           <div className="text-4xl font-display font-bold text-success mb-1">
             <AnimatedCounter to={donorStats?.livesSaved || 0} format={(v) => Math.floor(v)} />
           </div>
-          <div className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Life Saved</div>
+          <div className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
+            {donorStats?.livesSaved === 1 ? 'Life saved' : 'Lives saved'}
+          </div>
         </div>
         <div className="bg-warning/5 border border-warning/20 rounded-xl p-5 text-center">
           <div className="text-4xl font-display font-bold text-warning flex items-center justify-center gap-1 mb-1">
@@ -50,6 +53,8 @@ const StatsCard = ({ donorStats, requesterStats }) => {
           <div className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Requests Made</div>
         </div>
       </div>
+      {/* From the same count as Lives saved: donations completed through Donor */}
+      <DonationBadges donationCount={donorStats?.livesSaved || 0} />
     </div>
   );
 };
