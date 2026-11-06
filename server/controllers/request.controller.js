@@ -34,6 +34,7 @@ const {
 const { sendDonationRemindersIfDue } = require('../utils/donationReminders');
 const { generateShareToken } = require('../utils/shareToken');
 const { findBlockedPairUserIds, isBlockedPair } = require('../utils/blocks');
+const { getFirstName } = require('../utils/firstName');
 
 const RADIUS_KM = 15;
 const EARTH_RADIUS_KM = 6378.1;
@@ -98,7 +99,8 @@ const keepDonorsWithinExactRadius = (request, candidateDonors) =>
   );
 
 // The newBloodRequest payload: only the fields the donor's incoming card reads, so no
-// requesterId or other user ids
+// requesterId or other user ids. requesterName is the full name, for the app; the push shows only
+// the first (sendNewRequestAlerts).
 const buildRequestForDonors = (request, requesterName) => {
   const savedRequest = request.toObject();
   return {
@@ -119,6 +121,9 @@ const buildRequestForDonors = (request, requesterName) => {
 // would try a 500), and one failing donor must not stop the rest from being notified.
 const sendNewRequestAlerts = (donorsToNotify, requestForDonors) => {
   const { bloodGroup, unitsNeeded, hospitalName, requesterName } = requestForDonors;
+  // The push shows only this: it can appear on a locked screen, for anyone near the phone to read
+  // (utils/firstName.js). The socket event keeps the full name, for the app.
+  const requesterFirstName = getFirstName(requesterName);
 
   donorsToNotify.forEach((donor) => {
     try {
@@ -141,7 +146,7 @@ const sendNewRequestAlerts = (donorsToNotify, requestForDonors) => {
       if (donor.pushSubscription && !pushEndpointProblem) {
         const payload = JSON.stringify({
           title: '🚨 Emergency Blood Request!',
-          body: `${requesterName} needs ${unitsNeeded} ${unitsNeeded === 1 ? 'unit' : 'units'} of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
+          body: `${requesterFirstName} needs ${unitsNeeded} ${unitsNeeded === 1 ? 'unit' : 'units'} of ${bloodGroup} at ${hospitalName}. ${isExactMatch ? 'You are an exact match!' : 'You are a compatible match!'}`,
           icon: '/pwa-192x192.png',
           data: { url: '/dashboard' }
         });

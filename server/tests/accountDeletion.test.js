@@ -1050,7 +1050,8 @@ describe('DELETE /api/users/me: a request the deleted donor had accepted is anno
     expect(webpush.sendNotification).toHaveBeenCalledTimes(1);
     const [subscription, pushPayload] = webpush.sendNotification.mock.calls[0];
     expect(subscription).toEqual(PUSH_SUBSCRIPTION);
-    expect(JSON.parse(pushPayload).body).toBe('Rita Requester needs 2 units of B+ at Erase Test Hospital. You are an exact match!');
+    // The first name only, as for a new request: a push can show on a locked screen
+    expect(JSON.parse(pushPayload).body).toBe('Rita needs 2 units of B+ at Erase Test Hospital. You are an exact match!');
     // The request itself is back to pending, and Declan's decline is kept
     const stored = await Request.collection.findOne({ _id: bloodRequest._id });
     expect(stored).toMatchObject({ status: 'pending', matchedDonorId: null });

@@ -292,10 +292,31 @@ const mergeNotifications = (first, second) => ({
   requestersOfReopenedRequests: appendUnseenRequests(first.requestersOfReopenedRequests, second.requestersOfReopenedRequests),
 });
 
+/**
+ * Closes a request that a block or an account deletion has just put back to pending, if it already
+ * has enough reports to close (closeRequestIfReported): reports made while it was accepted are only
+ * stored. Run before its requester is told it is open to donors again, so that a request closed
+ * here sends its requester only the "closed after reports" event, as an expired one sends only its
+ * expiry. Logged, never thrown: after a failure the requester is told it is open, and
+ * announceReopenedRequests tries the close again.
+ * @param {import('mongoose').Types.ObjectId} requestId
+ * @param {string} logLabel - names the caller in the log
+ * @returns {Promise<boolean>} whether this call closed it
+ */
+const closeReopenedRequestIfReported = async (requestId, logLabel) => {
+  try {
+    return await closeRequestIfReported(requestId);
+  } catch (error) {
+    console.error(`${logLabel}: failed to check the reports on reopened request ${requestId}:`, error.message);
+    return false;
+  }
+};
+exports.closeReopenedRequestIfReported = closeReopenedRequestIfReported;
+
 // Only after the commit. The account is already gone, so a failed emit is logged and the rest
 // still go out; it never turns the deletion into a 500. The payloads carry a reason and no name:
 // the account was deleted, so its name is not passed on.
-const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, requestersOfReopenedRequests }) => {
+const notifyAfterAccountDeletion = async (deletedUser, { donorsOfCancelledRequests, requestersOfReopenedRequests }) => {
   donorsOfCancelledRequests.forEach(({ requestId, donorId }) => {
     try {
       // The event a cancel by the requester sends (cancelRequest)
@@ -309,11 +330,14 @@ const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, re
     }
   });
 
-  requestersOfReopenedRequests.forEach(({ requestId, requesterId, createdAt }) => {
+  for (const { requestId, requesterId, createdAt } of requestersOfReopenedRequests) {
     try {
       // Already past its open hours: announceReopenedRequests closes it instead, which sends its
       // requester the expiry event. "Open to donors again" right before it would contradict it.
-      if (hasExpired({ status: 'pending', createdAt })) return;
+      if (hasExpired({ status: 'pending', createdAt })) continue;
+      // Already reported by enough users: closed now, which sends its requester the "closed after
+      // reports" event instead, for the same reason
+      if (await closeReopenedRequestIfReported(requestId, 'deleteAccount')) continue;
       // The event an accept sends (acceptRequest), with the new status
       io.to(String(requesterId)).emit('requestStatusUpdate', {
         requestId,
@@ -323,7 +347,7 @@ const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, re
     } catch (error) {
       console.error(`deleteAccount: failed to notify requester ${requesterId} of reopened request ${requestId}:`, error.message);
     }
-  });
+  }
 
   try {
     // Every tab and device of this user leaves its room at once. socket.io-client does not retry a
@@ -343,7 +367,9 @@ const notifyAfterAccountDeletion = (deletedUser, { donorsOfCancelledRequests, re
 // Its open hours still count from when it was created (utils/requestExpiry.js), so one that is
 // already past them is closed now, which tells its requester, and no donor is alerted about it.
 // One that already has enough reports to close (closeRequestIfReported, e.g. reports made while it
-// was accepted) is closed the same way, instead of going back to nearby donors.
+// was accepted) is closed the same way, instead of going back to nearby donors. Most of those were
+// closed before their requester was told anything (closeReopenedRequestIfReported); this catches a
+// close that failed there, and reports that arrived since.
 // Also used when a block ends a match (block.controller.js); logLabel names the caller in the log.
 const announceReopenedRequests = async (requestersOfReopenedRequests, logLabel = 'deleteAccount') => {
   for (const { requestId } of requestersOfReopenedRequests) {
@@ -403,7 +429,9 @@ exports.deleteAccount = async (req, res) => {
 
     // Same attributes as the login cookie, as in logout, so the browser matches and removes it
     res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
-    notifyAfterAccountDeletion(deletedUser, notifications);
+    // Awaited: a reopened request it closes after reports is closed before the 200, as a block's is
+    // (block.controller.js). It never rejects: it logs its own failures.
+    await notifyAfterAccountDeletion(deletedUser, notifications);
     res.status(200).json({ message: 'Your account has been deleted' });
 
     // Not awaited: the 200 has been sent, and announceReopenedRequests logs its own failures.
