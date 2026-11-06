@@ -45,7 +45,9 @@ const OfflineOverlay = () => {
             
             <div className="bg-warning/10 border border-warning/20 p-4 rounded-xl flex items-start gap-3 text-left w-full">
               <WarningCircleIcon weight="fill" className="w-6 h-6 text-warning shrink-0 mt-0.5" />
-              <p className="text-sm text-warning-content/80">
+              {/* The page's text colour: warning-content is the same deep amber in both themes, which
+                  measured 1.2:1 on this tint in the dark one */}
+              <p className="text-sm text-base-content/80">
                 Please reconnect to the internet to resume using the app. This page will automatically disappear once your connection is restored.
               </p>
             </div>

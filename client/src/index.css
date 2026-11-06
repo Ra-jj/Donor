@@ -1,4 +1,10 @@
 @import "tailwindcss";
+/* Tailwind builds CSS for every word in the source that names a class, comments and visible text
+   included. These daisyUI component names appear here only as words, never as classes: in comments
+   and visible text ("share link", "Three simple steps", and "rating!" ending a popup's sentence),
+   and as JavaScript names (status, toast, filter, rating, step). Leaving them out drops CSS no page
+   uses, Tailwind's own filter utility too. Take a word off this line before using it as a class. */
+@source not inline("link list status toast filter rating rating! steps step");
 /* leaflet.css is imported by DonorMap.jsx, so it loads with the map instead of blocking every first paint */
 @plugin "daisyui" {
   themes: light, dark;

@@ -5,7 +5,7 @@ const { io } = require('../lib/socket');
 const { MAX_BLOCKS_PER_USER } = require('../utils/blocks');
 const { hasExpired } = require('../utils/requestExpiry');
 const { describeRequestRole, reopenAcceptedRequest } = require('./request.controller');
-const { announceReopenedRequests } = require('./user.controller');
+const { announceReopenedRequests, closeReopenedRequestIfReported } = require('./user.controller');
 
 // What each side of a match that a block ended is told. The blocked person never hears it was a
 // block: a donor whose requester blocked them hears only that the request is no longer theirs
@@ -13,7 +13,7 @@ const { announceReopenedRequests } = require('./user.controller');
 // longer help, as if they had withdrawn (reason 'donor_withdrew'). The blocker's own other tabs and
 // devices get reason 'blocked', and apply it without a popup. Logged, never thrown: the match has
 // already ended.
-const notifyMatchEnded = (reopenedRequest, donorId, isBlockerTheRequester) => {
+const notifyMatchEnded = async (reopenedRequest, donorId, isBlockerTheRequester) => {
   try {
     // The event a cancel sends the donor (cancelRequest), so their card goes and they are free
     io.to(String(donorId)).emit('requestStatusUpdate', {
@@ -24,13 +24,15 @@ const notifyMatchEnded = (reopenedRequest, donorId, isBlockerTheRequester) => {
     // Already past its open hours: announceReopenedRequests closes it, which sends its requester the
     // expiry event, and "open to donors again" right before that would contradict it (as in
     // deleteAccount's notifyAfterAccountDeletion)
-    if (!hasExpired(reopenedRequest)) {
-      io.to(String(reopenedRequest.requesterId)).emit('requestStatusUpdate', {
-        requestId: reopenedRequest._id,
-        status: 'pending',
-        reason: isBlockerTheRequester ? 'blocked' : 'donor_withdrew',
-      });
-    }
+    if (hasExpired(reopenedRequest)) return;
+    // Already reported by enough users while it was accepted: closed now, which sends its requester
+    // the "closed after reports" event instead, for the same reason
+    if (await closeReopenedRequestIfReported(reopenedRequest._id, 'block')) return;
+    io.to(String(reopenedRequest.requesterId)).emit('requestStatusUpdate', {
+      requestId: reopenedRequest._id,
+      status: 'pending',
+      reason: isBlockerTheRequester ? 'blocked' : 'donor_withdrew',
+    });
   } catch (error) {
     console.error(`Block: failed to tell both sides that the match on request ${reopenedRequest._id} ended:`, error.message);
   }
@@ -68,7 +70,7 @@ const endMatchesAfterBlock = async (blocker, blockedUserId) => {
   for (const match of matches) {
     const reopenedRequest = await reopenAcceptedRequest(match._id, match.matchedDonorId, { asDeclined: true });
     if (!reopenedRequest) continue;
-    notifyMatchEnded(reopenedRequest, match.matchedDonorId, String(match.requesterId) === String(blocker._id));
+    await notifyMatchEnded(reopenedRequest, match.matchedDonorId, String(match.requesterId) === String(blocker._id));
     reopenedRequests.push({ requestId: reopenedRequest._id });
   }
   return reopenedRequests;

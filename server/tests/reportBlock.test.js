@@ -741,7 +741,7 @@ describe('a block during an accepted request between the two', () => {
     expect((await patchStatus(donor, otherRequest._id, 'accepted')).statusCode).toBe(200);
   });
 
-  it('closes a reopened request that already has enough reports, instead of announcing it to donors again', async () => {
+  it('closes a reopened request that already has enough reports, instead of announcing it to donors again, and tells its requester only that', async () => {
     const requester = await registerRequester();
     const donor = await registerUser({ name: 'Dana Donor' });
     const viewers = [await registerUser(), await registerUser({ location: ALSO_NEARBY })];
@@ -756,11 +756,69 @@ describe('a block during an accepted request between the two', () => {
 
     expect((await blockOn(donor, bloodRequest._id)).statusCode).toBe(201);
 
-    await waitUntil(async () => (await storedRequest(bloodRequest)).status === 'cancelled');
+    // Closed before the answer
     expect(await storedRequest(bloodRequest)).toMatchObject({ status: 'cancelled', closedReason: 'reported' });
     await delay(SILENCE_WINDOW_MS);
     expect(socket.alertedRooms()).toEqual([]);
     expect(await incomingIds(bystander)).toEqual([]);
+    // Never "open to donors again" first: that would not be true for a moment
+    const toRequester = socket.statusUpdates().filter(({ room }) => room === requester.id).map(({ payload }) => payload);
+    expect(toRequester).toEqual([
+      { requestId: String(bloodRequest._id), status: 'cancelled', reason: 'reported', hospitalName: 'Safety Test Hospital' },
+    ]);
+    // The donor who blocked hears only that it is no longer theirs, as with any block
+    const toDonor = socket.statusUpdates().filter(({ room }) => room === donor.id).map(({ payload }) => payload.reason);
+    expect(toDonor).toEqual(['blocked']);
+  });
+
+  it('closes a reported request the requester reopened by blocking its donor, and their other tabs hear only that', async () => {
+    const requester = await registerRequester();
+    const donor = await registerUser({ name: 'Dana Donor' });
+    const viewers = [await registerUser(), await registerUser(), await registerUser({ location: ALSO_NEARBY })];
+    const bloodRequest = await createBloodRequest(requester.id, { status: 'accepted', matchedDonorId: donor.id });
+    for (const reporter of viewers) {
+      expect((await reportRequest(reporter, bloodRequest._id)).statusCode).toBe(201);
+    }
+    const socket = spyOnSocket();
+
+    const res = await blockOn(requester, bloodRequest._id);
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body).toEqual({ message: 'Blocked', endedMatch: true });
+    expect(await storedRequest(bloodRequest)).toMatchObject({ status: 'cancelled', closedReason: 'reported' });
+    await delay(SILENCE_WINDOW_MS);
+    expect(socket.alertedRooms()).toEqual([]);
+    const requestId = String(bloodRequest._id);
+    const toRequester = socket.statusUpdates().filter(({ room }) => room === requester.id).map(({ payload }) => payload);
+    expect(toRequester).toEqual([{ requestId, status: 'cancelled', reason: 'reported', hospitalName: 'Safety Test Hospital' }]);
+    // The blocked donor is told the match ended, and nothing about the reports
+    const toDonor = socket.statusUpdates().filter(({ room }) => room === donor.id).map(({ payload }) => payload);
+    expect(toDonor).toEqual([{ requestId, status: 'cancelled', reason: 'match_ended' }]);
+  });
+
+  it('still says it is open again when the reports check fails, and closes it after the answer instead', async () => {
+    const requester = await registerRequester();
+    const donor = await registerUser({ name: 'Dana Donor' });
+    const viewers = [await registerUser(), await registerUser(), await registerUser({ location: ALSO_NEARBY })];
+    const bloodRequest = await createBloodRequest(requester.id, { status: 'accepted', matchedDonorId: donor.id });
+    for (const reporter of viewers) {
+      expect((await reportRequest(reporter, bloodRequest._id)).statusCode).toBe(201);
+    }
+    // The first count of reporters is the check before the requester is told
+    jest.spyOn(Report, 'distinct').mockRejectedValueOnce(new Error('forced reports failure'));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const socket = spyOnSocket();
+
+    expect((await blockOn(donor, bloodRequest._id)).statusCode).toBe(201);
+
+    expect(consoleError).toHaveBeenCalledWith(
+      `block: failed to check the reports on reopened request ${bloodRequest._id}:`,
+      'forced reports failure'
+    );
+    await waitUntil(async () => (await storedRequest(bloodRequest)).status === 'cancelled');
+    expect(await storedRequest(bloodRequest)).toMatchObject({ status: 'cancelled', closedReason: 'reported' });
+    await delay(SILENCE_WINDOW_MS);
+    expect(socket.alertedRooms()).toEqual([]);
     const toRequester = socket.statusUpdates().filter(({ room }) => room === requester.id).map(({ payload }) => payload.reason);
     expect(toRequester).toEqual(['donor_withdrew', 'reported']);
   });
@@ -975,6 +1033,32 @@ describe('account deletion and blocks or reports', () => {
       await Report.collection.find({}).toArray(),
     ]);
     expect(leftovers).not.toContain(leaver.id);
+  });
+
+  it("closes a reported request that the deleted donor had accepted, and tells its requester only that", async () => {
+    const requester = await registerRequester();
+    const leaver = await registerUser({ name: 'Leela Leaver' });
+    const viewers = [await registerUser(), await registerUser(), await registerUser({ location: ALSO_NEARBY })];
+    const bystander = await registerUser({ name: 'Bea Bystander', location: ALSO_NEARBY });
+    const bloodRequest = await createBloodRequest(requester.id, { status: 'accepted', matchedDonorId: leaver.id });
+    // The leaver's own reports go with their account, so these three are the ones that count
+    for (const reporter of viewers) {
+      expect((await reportRequest(reporter, bloodRequest._id)).statusCode).toBe(201);
+    }
+    const socket = spyOnSocket();
+
+    expect((await deleteAccount(leaver)).statusCode).toBe(200);
+
+    // Closed before the answer
+    expect(await storedRequest(bloodRequest)).toMatchObject({ status: 'cancelled', closedReason: 'reported', matchedDonorId: null });
+    await delay(SILENCE_WINDOW_MS);
+    expect(socket.alertedRooms()).toEqual([]);
+    expect(await incomingIds(bystander)).toEqual([]);
+    // Never "your donor deleted their account, open to donors again" first
+    const toRequester = socket.statusUpdates().filter(({ room }) => room === requester.id).map(({ payload }) => payload);
+    expect(toRequester).toEqual([
+      { requestId: String(bloodRequest._id), status: 'cancelled', reason: 'reported', hospitalName: 'Safety Test Hospital' },
+    ]);
   });
 
   it('removes a block written after the blocker was deleted (401)', async () => {

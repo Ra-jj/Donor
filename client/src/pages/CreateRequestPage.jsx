@@ -425,15 +425,17 @@ const CreateRequestPage = () => {
               transition={fieldDelay(4)}
               className="form-control"
             >
-              <label className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Urgency Level</span></label>
+              <label htmlFor="urgency-level" className="label"><span className="label-text font-semibold text-base-content/70 text-xs uppercase tracking-wider">Urgency Level</span></label>
               <select 
+                id="urgency-level"
                 className="select w-full rounded-xl border border-base-300 bg-base-100 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium text-base"
                 value={formData.urgency}
                 onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
               >
+                {/* The short wording: the select shows its choice on one line (lib/urgencyLevels.js) */}
                 {URGENCY_LEVELS.map((level) => (
                   <option key={level.value} value={level.value} className="text-base-content font-medium">
-                    {level.label}
+                    {level.selectLabel}
                   </option>
                 ))}
               </select>

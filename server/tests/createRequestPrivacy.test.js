@@ -315,9 +315,41 @@ describe('POST /api/requests donor privacy', () => {
     expect(sendNotificationSpy).toHaveBeenCalledTimes(1);
     const [subscription, payload] = sendNotificationSpy.mock.calls[0];
     expect(subscription).toEqual(PUSH_SUBSCRIPTION);
+    // The requester's first name only: a push can show on a locked screen
     expect(JSON.parse(payload)).toMatchObject({
-      body: 'Rita Requester needs 2 units of B+ at Privacy Test Hospital. You are a compatible match!',
+      body: 'Rita needs 2 units of B+ at Privacy Test Hospital. You are a compatible match!',
     });
+  });
+
+  it("shows only the requester's first name in the push, while the live alert in the app keeps the full name", async () => {
+    const HOSPITAL = [77.5946, 12.9716]; // Bangalore
+    const PUSH_SUBSCRIPTION = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/first-name',
+      keys: { p256dh: 'a', auth: 'b' },
+    };
+    // Stored with its spaces as typed: the model trims only the ends of a name
+    const requester = await registerUser({ name: 'Priya   Lakshmi Sen', bloodGroup: 'A+', location: HOSPITAL });
+    const donor = await registerUser({ name: 'Dev Donor', bloodGroup: 'B+', location: [77.6, 12.975] });
+    await User.findByIdAndUpdate(donor.id, { pushSubscription: PUSH_SUBSCRIPTION });
+    const emit = jest.fn();
+    jest.spyOn(io, 'to').mockReturnValue({ emit });
+
+    const res = await createBloodRequest(requester.cookie, 'B+', HOSPITAL);
+
+    expect(res.statusCode).toBe(201);
+    expect(sendNotificationSpy).toHaveBeenCalledTimes(1);
+    const [subscription, payload] = sendNotificationSpy.mock.calls[0];
+    expect(subscription).toEqual(PUSH_SUBSCRIPTION);
+    const push = JSON.parse(payload);
+    expect(push.body).toBe('Priya needs 2 units of B+ at Privacy Test Hospital. You are an exact match!');
+    // No other part of the name anywhere in what the push service carries
+    expect(payload).not.toContain('Lakshmi');
+    expect(payload).not.toContain('Sen');
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    const [eventName, alert] = emit.mock.calls[0];
+    expect(eventName).toBe('newBloodRequest');
+    expect(alert.requesterName).toBe('Priya   Lakshmi Sen');
   });
 
   it('rounds negative coordinates away from zero and merges donors on the same pin', async () => {

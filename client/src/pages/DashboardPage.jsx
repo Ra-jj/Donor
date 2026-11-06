@@ -50,6 +50,27 @@ const CARD_EXIT_MS = 500;
 // setTimeout fires at once for any longer delay
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
+// Below lg the round "+" button floats over the lists, 24 px from the screen's right edge and 56 px
+// wide, so its left edge is 80 px from that edge, while on a phone a card's content reaches to 37 px
+// from it. The rows of full-width buttons on a requester's own cards stop 52 px short, so at every
+// scroll position the "+" button passes beside them, 9 px clear (more on wider screens), instead of
+// over their right ends.
+const CLEAR_OF_ROUND_BUTTON = 'max-lg:pr-13';
+
+// A state's colour goes in the fill and edge only, and its words in the page's text colour, as on
+// the urgency pills: white or coloured words on these colours measured from 1.7:1 to 3.3:1 in one
+// theme or the other. TINTED_BUTTON has a stronger edge and a hover; daisyUI's disabled look loses to
+// these utilities, so a disabled button leaves them off.
+const TINTED = {
+  success: 'border bg-success/10 border-success/20 text-base-content',
+  warning: 'border bg-warning/10 border-warning/20 text-base-content',
+  info: 'border bg-info/10 border-info/20 text-base-content',
+};
+const TINTED_BUTTON = {
+  success: 'bg-success/10 border-success/40 hover:bg-success/20 text-base-content',
+  warning: 'bg-warning/10 border-warning/40 hover:bg-warning/20 text-base-content',
+};
+
 // The signed-in user's id now, through getState, so callbacks set up once still read the latest.
 // A response is applied only while this is the id it was asked for: one that arrives after a
 // sign-out and a sign-in as someone else belongs to the earlier user.
@@ -101,13 +122,14 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
       transition={{ duration: 0.3, layout: { duration: 0.25 } }}
       className="relative"
     >
-      {/* Swipe indicators behind the card */}
+      {/* Swipe hints behind the card */}
       <div className="absolute inset-0 rounded-2xl flex items-center justify-between px-6 pointer-events-none">
-        <div className={`flex items-center gap-2 text-error font-bold transition-opacity ${dragX < -30 ? 'opacity-100' : 'opacity-0'}`}>
-          <XCircleIcon weight="fill" className="w-6 h-6" /> Decline
+        {/* The colour is in the icons; red or green words measured 4.4:1 and 3.2:1 in the light theme */}
+        <div className={`flex items-center gap-2 text-base-content font-bold transition-opacity ${dragX < -30 ? 'opacity-100' : 'opacity-0'}`}>
+          <XCircleIcon weight="fill" className="w-6 h-6 text-error" /> Decline
         </div>
-        <div className={`flex items-center gap-2 text-success font-bold transition-opacity ${canAccept && dragX > 30 ? 'opacity-100' : 'opacity-0'}`}>
-          Accept <ChecksIcon weight="fill" className="w-6 h-6" />
+        <div className={`flex items-center gap-2 text-base-content font-bold transition-opacity ${canAccept && dragX > 30 ? 'opacity-100' : 'opacity-0'}`}>
+          Accept <ChecksIcon weight="fill" className="w-6 h-6 text-success" />
         </div>
       </div>
 
@@ -544,12 +566,15 @@ const DashboardPage = () => {
   };
 
   const UrgencyBadge = ({ urgency }) => {
+    // The colour is in the fill and edge only, and the word in the card's text colour, as on a shared
+    // request's page (PublicRequestPage.jsx): coloured words on their own tint measured 2.7:1 (low)
+    // and 3.8:1 (high) in the light theme, and 1.3:1 (medium) in the dark one
     const colors = {
-      low: 'bg-success/10 text-success border-success/20',
-      medium: 'bg-warning/10 text-warning-content border-warning/20',
-      high: 'bg-error/10 text-error border-error/20 font-bold'
+      low: 'bg-success/10 border-success/20',
+      medium: 'bg-warning/10 border-warning/20',
+      high: 'bg-error/10 border-error/20 font-bold'
     };
-    return <div className={`badge border px-3 py-1 text-xs uppercase tracking-wider ${colors[urgency] || 'badge-ghost'}`}>{urgency}</div>;
+    return <div className={`badge border px-3 py-1 text-xs uppercase tracking-wider text-base-content ${colors[urgency] || 'badge-ghost'}`}>{urgency}</div>;
   };
 
   if (loading) {
@@ -561,7 +586,9 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="space-y-8 pt-20">
+    // max-lg:pb-20: below lg, room under the last card, so at the foot of the page the round "+"
+    // button sits below its buttons instead of on them
+    <div className="space-y-8 pt-20 max-lg:pb-20">
       {/* Header Profile Section */}
       <motion.div 
         initial={{ opacity: 0, y: 12 }}
@@ -574,7 +601,7 @@ const DashboardPage = () => {
           <h1 className="text-3xl font-display font-extrabold text-base-content tracking-tight mb-1 truncate" title={`Welcome, ${authUser?.name || 'User'}`}>
             Welcome, {authUser?.name || 'User'}
           </h1>
-          <p className="text-base-content/70 font-medium text-lg">Your Blood Group: <strong className="text-primary bg-primary/10 px-3 py-1 rounded-full ml-1">{authUser?.bloodGroup || 'Not set'}</strong></p>
+          <p className="text-base-content/70 font-medium text-lg">Your Blood Group: <strong className="text-base-content bg-primary/10 px-3 py-1 rounded-full ml-1">{authUser?.bloodGroup || 'Not set'}</strong></p>
         </div>
         
         <div className="hidden lg:flex items-center gap-4 z-10 relative w-full sm:w-auto">
@@ -596,12 +623,16 @@ const DashboardPage = () => {
         </motion.div>
       )}
 
-      {/* Mobile FAB */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-40">
-        <Link to="/create-request" className="btn btn-primary btn-circle w-14 h-14 shadow-lg shadow-primary/30 glow-primary text-white flex items-center justify-center active:scale-90 transition-transform">
-          <PlusIcon weight="bold" className="w-7 h-7" />
-        </Link>
-      </div>
+      {/* Mobile FAB. Not while a request is selected: below lg its chat then takes the place of the
+          lists, and at the foot of the chat the button sat right on top of Send. "Back to Requests"
+          brings it back. */}
+      {!selectedRequestId && (
+        <div className="lg:hidden fixed bottom-6 right-6 z-40">
+          <Link to="/create-request" className="btn btn-primary btn-circle w-14 h-14 shadow-lg shadow-primary/30 glow-primary text-white flex items-center justify-center active:scale-90 transition-transform">
+            <PlusIcon weight="bold" className="w-7 h-7" />
+          </Link>
+        </div>
+      )}
 
       {/* Push Notification Banner */}
       {'Notification' in window && !pushEnabled && (
@@ -619,12 +650,12 @@ const DashboardPage = () => {
               <p className="text-xs sm:text-sm text-base-content/70">Get instantly alerted on your phone when an emergency matches your blood group.</p>
             </div>
           </div>
-          <button onClick={enablePushNotifications} className="btn btn-info btn-sm rounded-lg text-white font-semibold">Enable Now</button>
+          <button onClick={enablePushNotifications} className="btn btn-info btn-sm rounded-lg text-base-100 font-semibold">Enable Now</button>
         </motion.div>
       )}
 
-      {/* Tabs with animated indicator */}
-      {/* Narrower than 390 px the two buttons get less padding, and narrower than 360 px no icons,
+      {/* The switch between the two request views, its red fill sliding to the chosen one.
+          Narrower than 390 px the two buttons get less padding, and narrower than 360 px no icons,
           so both still fit side by side (with a two-digit count too) */}
       <div className={`flex justify-center sm:justify-start ${selectedRequestId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="bg-base-100 border border-base-300 p-1.5 rounded-2xl inline-flex shadow-sm w-full sm:w-auto relative">
@@ -636,7 +667,7 @@ const DashboardPage = () => {
               <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
             )}
             {incomingRequests.filter(r => r.status === 'pending').length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold mr-1 ${activeTab === 'incoming' ? 'bg-white text-primary' : 'bg-error text-white'}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold mr-1 ${activeTab === 'incoming' ? 'bg-base-100 text-base-content' : 'bg-error text-base-100'}`}>
                 {incomingRequests.filter(r => r.status === 'pending').length}
               </span>
             )}
@@ -707,14 +738,14 @@ const DashboardPage = () => {
                           <div className="card-body p-5">
                             <div className="bg-success/5 border border-success/10 rounded-2xl p-5 text-center space-y-3">
                               <CheckCircleIcon weight="fill" className="w-12 h-12 text-success mx-auto" />
-                              <h3 className="font-display font-bold text-lg text-success">Donation Complete!</h3>
+                              <h3 className="font-display font-bold text-lg text-base-content">Donation Complete!</h3>
                               <p className="text-sm text-base-content/70 wrap-anywhere">
                                 Thank you for donating at <strong>{req.hospitalName}</strong>.
                               </p>
                               {req.rating ? (
                                 <div className="space-y-1">
                                   <StarRating rating={req.rating} size="w-5 h-5" className="justify-center" />
-                                  <p className="text-xs text-base-content/50">
+                                  <p className="text-xs text-base-content/70">
                                     Rated {req.rating}/5 by the requester
                                   </p>
                                   {req.ratingNote && (
@@ -723,9 +754,9 @@ const DashboardPage = () => {
                                 </div>
                               ) : req.requesterId === null ? (
                                 // Populated as null once the requester has deleted their account
-                                <p className="text-xs text-base-content/40">Not rated. The requester deleted their account.</p>
+                                <p className="text-xs text-base-content/70">Not rated. The requester deleted their account.</p>
                               ) : (
-                                <p className="text-xs text-base-content/40">Awaiting rating from requester</p>
+                                <p className="text-xs text-base-content/70">Awaiting rating from requester</p>
                               )}
                             </div>
                           </div>
@@ -754,9 +785,9 @@ const DashboardPage = () => {
                                 <h3 className="card-title block flex-1 max-w-full wrap-break-word text-lg leading-snug">{req.hospitalName}</h3>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {req.matchType === 'exact' ? (
-                                    <span className="badge badge-success badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-success/20">Exact Match</span>
+                                    <span className={`badge badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold ${TINTED.success}`}>Exact Match</span>
                                   ) : req.matchType === 'compatible' ? (
-                                    <span className="badge badge-info badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold text-white shadow-sm shadow-info/20">Compatible Match</span>
+                                    <span className={`badge badge-sm h-auto py-1 px-2 whitespace-nowrap font-bold ${TINTED.info}`}>Compatible Match</span>
                                   ) : null}
                                   <UrgencyBadge urgency={req.urgency} />
                                   {req.status === 'pending' && (
@@ -781,18 +812,18 @@ const DashboardPage = () => {
                                         Swipe or tap →
                                       </span>
                                     )}
-                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-error">Decline</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'declined'); }} className="btn btn-sm btn-ghost text-base-content/80">Decline</button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleUpdateStatus(req._id, 'accepted'); }}
                                       disabled={!canAcceptRequests}
                                       aria-describedby={isResting ? 'donation-gap-notice' : undefined}
-                                      className="btn btn-sm btn-success text-white"
+                                      className={`btn btn-sm ${canAcceptRequests ? TINTED_BUTTON.success : ''}`}
                                     >
                                       Accept & Help
                                     </button>
                                   </>
                                 ) : req.status === 'accepted' ? (
-                                  <div className="badge badge-success text-white p-3 font-semibold">Accepted by you</div>
+                                  <div className={`badge p-3 font-semibold ${TINTED.success}`}>Accepted by you</div>
                                 ) : (
                                   <div className="badge">{req.status}</div>
                                 )}
@@ -840,9 +871,9 @@ const DashboardPage = () => {
                           <div className="flex flex-wrap justify-between items-start gap-y-2">
                             <h3 className="card-title block flex-1 max-w-full wrap-break-word text-lg">{req.hospitalName}</h3>
                             <div className={`badge shrink-0 ${
-                              req.status === 'pending' ? 'badge-warning' : 
-                              req.status === 'accepted' ? 'badge-success text-white' : 
-                              req.status === 'fulfilled' ? 'badge-info text-white' : ''
+                              req.status === 'pending' ? TINTED.warning :
+                              req.status === 'accepted' ? TINTED.success :
+                              req.status === 'fulfilled' ? TINTED.info : ''
                             }`}>
                               {isExpiredRequest(req) ? 'EXPIRED' : isReportedRequest(req) ? 'CLOSED' : req.status.toUpperCase()}
                             </div>
@@ -874,15 +905,15 @@ const DashboardPage = () => {
 
                           {/* Still without a donor, so the requester can ask people outside the app too */}
                           {req.status === 'pending' && (
-                            <div className="mt-4">
+                            <div className={`mt-4 ${CLEAR_OF_ROUND_BUTTON}`}>
                               <ShareRequestButtons request={req} />
                             </div>
                           )}
 
                           {/* Accepted state: show chat prompt + fulfill button */}
                           {req.status === 'accepted' && (
-                            <div className="space-y-3 mt-2">
-                              <div className="alert alert-success bg-success/10 text-success border-success/20 p-2 flex justify-center text-center">
+                            <div className={`space-y-3 mt-2 ${CLEAR_OF_ROUND_BUTTON}`}>
+                              <div className="alert alert-success bg-success/10 text-base-content border-success/20 p-2 flex justify-center text-center">
                                 A donor has accepted this request! Open chat to coordinate.
                               </div>
                               <button
@@ -949,21 +980,24 @@ const DashboardPage = () => {
                                     <button
                                       onClick={() => handleRate(req._id)}
                                       disabled={ratingValue === 0 || ratingLoading}
-                                      className="btn btn-sm btn-warning text-white flex-1 font-bold"
+                                      className={`btn btn-sm flex-1 font-bold ${ratingValue === 0 || ratingLoading ? '' : TINTED_BUTTON.warning}`}
                                     >
                                       {ratingLoading ? <span className="loading loading-spinner loading-xs"></span> : 'Submit Rating'}
                                     </button>
                                   </div>
                                 </motion.div>
                               ) : (
-                                /* Not yet rated — show rate button */
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setRatingRequestId(req._id); }}
-                                  className="btn btn-sm btn-outline btn-warning w-full rounded-xl font-bold"
-                                >
-                                  <StarIcon weight="bold" className="w-4 h-4" />
-                                  Rate this Donor
-                                </button>
+                                /* Not yet rated — show rate button. The open form above keeps the full
+                                   width: at 320 px, 52 px less would wrap "Submit Rating". */
+                                <div className={CLEAR_OF_ROUND_BUTTON}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setRatingRequestId(req._id); }}
+                                    className={`btn btn-sm w-full rounded-xl font-bold ${TINTED_BUTTON.warning}`}
+                                  >
+                                    <StarIcon weight="bold" className="w-4 h-4" />
+                                    Rate this Donor
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )}

@@ -371,7 +371,7 @@ const ProfilePage = () => {
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-semibold text-base-content/70 flex justify-between items-center">
               <span>Location</span>
-              {formData.location && <span className="text-success text-xs font-bold">✓ Location Set</span>}
+              {formData.location && <span className="text-base-content text-xs font-bold">✓ Location Set</span>}
             </label>
             <div className="flex gap-2">
               <div className="flex-1 input bg-base-200 rounded-xl flex items-center opacity-60">
@@ -495,10 +495,10 @@ const ProfilePage = () => {
                       {req.rating ? (
                         <div className="bg-warning/10 px-3 py-2 rounded-xl flex items-center gap-2 shrink-0">
                           <StarRating rating={req.rating} size="w-4 h-4" />
-                          <span className="text-sm font-bold text-warning">{req.rating}/5</span>
+                          <span className="text-sm font-bold text-base-content">{req.rating}/5</span>
                         </div>
                       ) : (
-                        <div className="text-xs text-base-content/40 bg-base-300 px-3 py-1 rounded-full shrink-0">Not rated</div>
+                        <div className="text-xs text-base-content/70 bg-base-300 px-3 py-1 rounded-full shrink-0">Not rated</div>
                       )}
                     </div>
                   ))}
@@ -534,7 +534,9 @@ const ProfilePage = () => {
                           </Link>
                         </div>
                       ) : (
-                        <div className={`badge ${req.status === 'fulfilled' ? 'badge-info text-white' : req.status === 'accepted' ? 'badge-success text-white' : 'badge-ghost'}`}>
+                        // A state's colour in the fill and edge only, as on the dashboard: white words on
+                        // these colours measured 3.3:1 (light) and 1.7:1 (dark)
+                        <div className={`badge ${req.status === 'fulfilled' ? 'border bg-info/10 border-info/20 text-base-content' : req.status === 'accepted' ? 'border bg-success/10 border-success/20 text-base-content' : 'badge-ghost'}`}>
                           {isReportedRequest(req) ? 'closed' : req.status}
                         </div>
                       )}
