@@ -2,7 +2,8 @@ const Request = require('../models/request.model');
 const User = require('../models/user.model');
 const Report = require('../models/report.model');
 const { io } = require('../lib/socket');
-const webpush = require('web-push');
+// VAPID keys are set once there, for these alerts and the donation reminders alike
+const { webpush } = require('../utils/webPush');
 const {
   isCompatibleDonor,
   getCompatibleDonorGroups,
@@ -30,17 +31,9 @@ const {
   expireRequesterStaleRequests,
   expireStaleRequestsIfDue,
 } = require('../utils/requestExpiry');
+const { sendDonationRemindersIfDue } = require('../utils/donationReminders');
 const { generateShareToken } = require('../utils/shareToken');
 const { findBlockedPairUserIds, isBlockedPair } = require('../utils/blocks');
-
-// Configure web-push
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:admin@donorapp.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-}
 
 const RADIUS_KM = 15;
 const EARTH_RADIUS_KM = 6378.1;
@@ -285,6 +278,9 @@ exports.getIncomingRequests = async (req, res) => {
     // yet), and a sweep over a backlog would hold the list up for as long as it runs. It never
     // rejects: it logs its own failures.
     expireStaleRequestsIfDue();
+    // Sends the "You can donate again" reminders that are due, the same way: throttled, not awaited,
+    // and never rejecting (utils/donationReminders.js)
+    sendDonationRemindersIfDue();
 
     // No open request from anyone in a block with this donor, whichever of them made it
     const blockedUserIds = await findBlockedPairUserIds(donor._id);

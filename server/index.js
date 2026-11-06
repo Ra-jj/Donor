@@ -30,6 +30,7 @@ const publicRoutes = require('./routes/public.route');
 const { createSecurityHeaders } = require('./middleware/securityHeaders');
 const { parseTrustProxy } = require('./utils/parseTrustProxy');
 const { startRequestExpirySweeps } = require('./utils/requestExpiry');
+const { startDonationReminderSweeps } = require('./utils/donationReminders');
 const { app, server } = require('./lib/socket');
 
 const PORT = process.env.PORT || 8000;
@@ -119,6 +120,9 @@ if (require.main === module) {
     // it is awake. Not awaited: it logs its own failures, and a request read in the meantime
     // already treats an expired request as closed.
     startRequestExpirySweeps();
+    // Pushes "You can donate again" to donors whose gap between donations ended in the last few
+    // days, now and then while awake, once per donor and gap. Not awaited, for the same reasons.
+    startDonationReminderSweeps();
   };
   startServer();
 }

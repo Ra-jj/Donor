@@ -79,6 +79,10 @@ const PrivacyPage = () => (
             only if you turn on notifications. It is an address at your browser's push service, plus the keys to
             encrypt messages to it. It holds no phone number.
           </Item>
+          <Item lead="Donation reminder:">
+            once one has been sent, which day the last “You can donate again” notification was for, so the
+            same one is never sent twice.
+          </Item>
           <Item lead="Blood requests you make:">
             hospital name, hospital location, blood group needed, units, urgency, status, dates and a random code for
             its share link.
@@ -109,9 +113,10 @@ const PrivacyPage = () => (
             Your browser also stores the app's own files so Donor opens quickly; they hold no personal data.
           </Item>
           <Item lead="Your IP address,">
-            which reaches our server with every request. To limit repeated sign-ups, login attempts and visits to shared
-            request links, the server keeps it in memory for up to two hours after your last attempt, and does not save
-            it in the database. Render, which hosts Donor, may also record it in its own request logs.
+            which reaches our server with every request. To limit repeated sign-ups, login attempts, visits to shared
+            request links and loads of the home page's totals, the server keeps it in memory for up to two hours after
+            your last attempt, and does not save it in the database. Render, which hosts Donor, may also record it in
+            its own request logs.
           </Item>
         </ul>
       </NoticeSection>
@@ -131,15 +136,18 @@ const PrivacyPage = () => (
           </Item>
           <Item lead="Notifications.">
             Your push subscription lets Donor alert your phone or computer when a compatible request is made nearby.
-            While the app is open, alerts also arrive over a live connection.
+            While the app is open, alerts also arrive over a live connection. When your gap between donations ends,
+            and "Available to donate" is on, Donor also sends you one notification saying you can donate again. It
+            goes out in the daytime, India time, within 3 days of that date, or not at all.
           </Item>
           <Item lead="Arranging a donation.">Chat lets a matched donor and requester agree on the details.</Item>
           <Item lead="History and ratings.">
             Your past requests and donations, and the ratings donors receive, are shown to you in Profile.
           </Item>
           <Item lead="Safety.">
-            Your IP address, held for a short time, slows down automated sign-ups, password guessing and attempts to
-            guess shared request links. Your consent record shows what you agreed to, and when.
+            Your IP address, held for a short time, slows down automated sign-ups, password guessing, attempts to
+            guess shared request links and repeated loading of the home page's totals. Your consent record shows what
+            you agreed to, and when.
           </Item>
           <Item lead="Reports and blocks.">
             Reports help Raj, who runs Donor, find fake requests and people who misuse the app, and close an open request
@@ -242,7 +250,7 @@ const PrivacyPage = () => (
         <ul className={itemsClassName}>
           <li>
             your profile: name, email, password hash, blood group, location, availability, outside donation date, push
-            subscription and consent record;
+            subscription, donation reminder date and consent record;
           </li>
           <li>every request you made that wasn't fulfilled, with its chat messages;</li>
           <li>every chat message you sent or received;</li>
@@ -284,8 +292,8 @@ const PrivacyPage = () => (
         <ul className={itemsClassName}>
           <Item lead="Stop request alerts.">
             Turn off "Available to donate" in <Link to="/profile" className="font-semibold text-primary underline">Profile</Link>.
-            You then get no new request alerts, push included, and aren't counted or shown on requesters' maps. You can
-            still see open requests near you.
+            You then get no new request alerts or donation reminders, push included, and aren't counted or shown on
+            requesters' maps. You can still see open requests near you.
           </Item>
           <Item lead="Turn notifications off.">
             Donor asks for permission only when you tap Enable Now on the dashboard. To turn notifications off, block

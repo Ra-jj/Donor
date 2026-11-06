@@ -158,6 +158,24 @@ const publicRequestLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Limit reads of the home page's totals (GET /api/public/stats) per IP address. They come from a
+ * copy in memory (controllers/publicStats.controller.js), so this only stops one address from
+ * hammering the server. As loose as the one above, and a separate count, so loading the home
+ * page never uses up anyone's allowance for opening shared links.
+ */
+const publicStatsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 300,
+  handler: (req, res) => {
+    res.status(429).json({
+      message: 'Too many requests from this network. Please wait a few minutes and try again.',
+    });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   loginLimiter,
   requestLimiter,
@@ -166,6 +184,7 @@ module.exports = {
   blockLimiter,
   registerLimiter,
   publicRequestLimiter,
+  publicStatsLimiter,
   resolveRegisterLimitConfig,
   DEFAULT_REGISTER_LIMIT,
 };

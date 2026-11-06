@@ -64,6 +64,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // The moment the donor could donate again (00:00 IST, see utils/donationGap.js) that the last
+    // "You can donate again" push was sent for. Written only by the reminder sweep
+    // (utils/donationReminders.js), whose claim matches only while this is earlier than the new
+    // moment, so each moment gets at most one reminder, whoever runs the sweep. Absent until the
+    // first reminder (no default), which that claim matches like an earlier moment.
+    donationReminderSentFor: {
+      type: Date,
+    },
     // ONLY the donor's own choice, set from the Profile toggle. Nothing else writes it.
     // "Busy" is derived, never stored here: a donor holding a Request with status 'accepted'
     // and matchedDonorId set to them is busy, and createRequest skips them even when this is true.
@@ -107,5 +115,9 @@ const userSchema = new mongoose.Schema(
 
 // Create a 2dsphere index on the location field for geospatial queries ($near, $geoNear)
 userSchema.index({ location: '2dsphere' });
+
+// Serves the donation reminder sweep (utils/donationReminders.js): outside donations from a few
+// days around DONATION_GAP_DAYS ago, a range that holds only a handful of donors at a time
+userSchema.index({ lastOutsideDonationDate: 1 });
 
 module.exports = mongoose.model('User', userSchema);
