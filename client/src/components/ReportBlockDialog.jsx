@@ -310,7 +310,7 @@ const ReportBlockDialog = ({ requestId, role, onClose, onChanged }) => {
             {/* Side by side from 360 px; narrower, one full-width row each, so neither wraps alone */}
             <div className="flex flex-col gap-2 min-[360px]:flex-row min-[360px]:justify-end">
               {backButton}
-              <button type="submit" disabled={isSending} className="btn btn-primary text-white rounded-xl font-bold">
+              <button type="submit" disabled={isSending} className="btn btn-primary text-primary-content rounded-xl font-bold">
                 {isSending ? (
                   <span className="loading loading-spinner loading-sm" aria-hidden="true"></span>
                 ) : (

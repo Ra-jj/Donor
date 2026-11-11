@@ -56,7 +56,7 @@ const AnimatedStat = ({ value, label }) => (
     <div className="text-3xl md:text-4xl font-display font-extrabold text-base-content tracking-tight whitespace-nowrap">
       {value}
     </div>
-    <div className="text-sm text-base-content/50 font-medium mt-1">{label}</div>
+    <div className="text-sm text-base-content/70 font-medium mt-1">{label}</div>
   </motion.div>
 );
 
@@ -191,7 +191,7 @@ const HomePage = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-sm font-medium text-primary mb-8"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 text-sm font-medium text-primary-strong mb-8"
           >
             <HeartbeatIcon weight="fill" className="w-4 h-4" />
             <span>Saving lives, one match at a time</span>
@@ -231,7 +231,7 @@ const HomePage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.8 }}
-            className="text-lg md:text-xl text-base-content/55 max-w-xl mx-auto mb-10 leading-relaxed font-body font-normal"
+            className="text-lg md:text-xl text-base-content/70 max-w-xl mx-auto mb-10 leading-relaxed font-body font-normal"
           >
             A fast, direct way to ask for blood near a hospital and reach compatible donors nearby.
           </motion.p>
@@ -245,7 +245,7 @@ const HomePage = () => {
           >
             <Link 
               to="/register" 
-              className="group btn btn-primary btn-lg rounded-full w-full sm:w-auto px-8 text-white font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all active:scale-98"
+              className="group btn btn-primary btn-lg rounded-full w-full sm:w-auto px-8 text-primary-content font-bold border-none shadow-lg shadow-primary/20 glow-primary hover:shadow-primary/30 transition-all active:scale-98"
             >
               Get Started
               <ArrowRightIcon weight="bold" className="w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />
@@ -308,7 +308,7 @@ const HomePage = () => {
             <h2 className="text-3xl md:text-4xl font-display font-extrabold text-base-content tracking-tight mb-4">
               How it works
             </h2>
-            <p className="text-base-content/50 max-w-md mx-auto font-normal">
+            <p className="text-base-content/70 max-w-md mx-auto font-normal">
               Three simple steps to bridge the gap between critical shortages and willing donors.
             </p>
           </motion.div>
@@ -331,7 +331,7 @@ const HomePage = () => {
                   <step.icon weight="duotone" className="w-5 h-5 text-primary" />
                 </div>
                 <h3 className="text-lg font-bold font-display mb-2 tracking-tight">{step.title}</h3>
-                <p className="text-base-content/50 text-sm leading-relaxed">
+                <p className="text-base-content/70 text-sm leading-relaxed">
                   {step.description}
                 </p>
               </motion.div>
@@ -366,12 +366,14 @@ const HomePage = () => {
               <h2 className="text-3xl md:text-4xl font-display font-extrabold tracking-tight mb-4">
                 Ready to make a difference?
               </h2>
-              <p className="text-white/70 max-w-md mx-auto mb-8 font-normal">
+              <p className="text-white/90 max-w-md mx-auto mb-8 font-normal">
                 Sign up as a donor, or ask for blood when someone needs it.
               </p>
+              {/* Red words on white in both themes, like the red behind them (bg-gradient-animated in
+                  index.css): the dark theme's lighter red measured 3.76:1 on this white */}
               <Link
                 to="/register"
-                className="group inline-flex justify-center items-center gap-2 w-full sm:w-auto bg-white text-primary font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg active:scale-98"
+                className="group inline-flex justify-center items-center gap-2 w-full sm:w-auto bg-white text-[#B91C1C] font-bold px-8 py-3.5 rounded-full hover:bg-white/90 transition-all shadow-lg active:scale-98"
               >
                 Create Free Account
                 <ArrowRightIcon weight="bold" className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -396,7 +398,7 @@ const HomePage = () => {
               <Link to="/privacy" className="hover:text-base-content transition-colors">Privacy</Link>
             </div>
 
-            <p className="text-sm text-base-content/30 font-medium">
+            <p className="text-sm text-base-content/70 font-medium">
               Made with <HeartIcon weight="fill" className="w-3.5 h-3.5 text-primary inline-block mx-0.5" /> for those who give.
             </p>
           </div>

@@ -5,6 +5,10 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { motion, AnimatePresence } from 'motion/react';
 
+// The account menu's items show keyboard focus with the red edge used everywhere else: daisyUI
+// gives them only a 10% grey fill, 1.22:1 (light) and 1.31:1 (dark) against the menu
+const MENU_ITEM_FOCUS = 'focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary';
+
 const Navbar = () => {
   const { authUser, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
@@ -43,31 +47,33 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-6">
             {authUser ? (
               <>
-                <Link to="/dashboard" className="font-semibold text-base-content/80 hover:text-primary transition-colors">Dashboard</Link>
-                <Link to="/create-request" className="font-semibold text-base-content/80 hover:text-primary transition-colors">New Request</Link>
+                <Link to="/dashboard" className="font-semibold text-base-content/80 hover:text-primary-strong transition-colors">Dashboard</Link>
+                <Link to="/create-request" className="font-semibold text-base-content/80 hover:text-primary-strong transition-colors">New Request</Link>
                 <div className="dropdown dropdown-end ml-4">
-                  <label tabIndex={0} className="btn btn-ghost btn-circle avatar border-2 border-primary/20 hover:border-primary">
-                    <div className="w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold font-display text-lg">
+                  {/* Under the pointer only the edge turns red: the grey hover fill behind the red initial
+                      measured 4.14:1 in the light theme */}
+                  <label tabIndex={0} className="btn btn-ghost btn-circle avatar border-2 border-primary/20 hover:border-primary hover:bg-transparent">
+                    <div className="w-10 rounded-full bg-primary/10 text-primary-strong flex items-center justify-center font-bold font-display text-lg">
                       {authUser?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
                   </label>
                   <ul tabIndex={0} className="mt-3 z-1 p-2 shadow-xl menu menu-sm dropdown-content bg-base-100 rounded-2xl w-56 border border-base-200">
-                    <li className="menu-title px-4 py-3 opacity-60 font-body text-xs uppercase tracking-wider">
+                    <li className="menu-title px-4 py-3 text-base-content/70 font-body text-xs uppercase tracking-wider">
                       Signed in as<br/><span className="font-bold text-base-content opacity-100 capitalize">{authUser?.name || 'User'}</span>
                     </li>
                     <div className="divider my-0"></div>
                     <li className="p-1">
-                      <Link to="/profile" className="hover:bg-base-200 flex gap-3 py-3 rounded-xl font-semibold text-base-content/80">
+                      <Link to="/profile" className={`hover:bg-base-200 flex gap-3 py-3 rounded-xl font-semibold text-base-content/80 ${MENU_ITEM_FOCUS}`}>
                         Profile
                       </Link>
                     </li>
                     <li className="p-1">
-                      <Link to="/privacy" className="hover:bg-base-200 flex gap-3 py-3 rounded-xl font-semibold text-base-content/80">
+                      <Link to="/privacy" className={`hover:bg-base-200 flex gap-3 py-3 rounded-xl font-semibold text-base-content/80 ${MENU_ITEM_FOCUS}`}>
                         Privacy
                       </Link>
                     </li>
                     <li className="p-1">
-                      <button onClick={logout} className="text-error hover:bg-error/10 hover:text-error flex gap-3 py-3 rounded-xl font-semibold">
+                      <button onClick={logout} className={`text-error hover:bg-error/10 hover:text-error-strong flex gap-3 py-3 rounded-xl font-semibold ${MENU_ITEM_FOCUS}`}>
                         <SignOutIcon weight="regular" className="w-5 h-5" />
                         Log out
                       </button>
@@ -98,7 +104,7 @@ const Navbar = () => {
               </>
             ) : (
               <div className="flex items-center gap-3">
-                <Link to="/privacy" className="font-semibold text-base-content/70 hover:text-primary transition-colors px-2">Privacy</Link>
+                <Link to="/privacy" className="font-semibold text-base-content/70 hover:text-primary-strong transition-colors px-2">Privacy</Link>
                 <button
                   onClick={toggleTheme}
                   className="btn btn-ghost btn-circle text-base-content/70 hover:text-primary transition-colors"
@@ -121,7 +127,7 @@ const Navbar = () => {
                   </AnimatePresence>
                 </button>
                 <Link to="/login" className="btn btn-ghost rounded-full px-6 font-semibold active:scale-95 transition-transform min-h-11">Log in</Link>
-                <Link to="/register" className="btn btn-primary rounded-full px-6 text-white font-bold border-none shadow-md shadow-primary/20 active:scale-95 transition-transform min-h-11">Sign up</Link>
+                <Link to="/register" className="btn btn-primary rounded-full px-6 text-primary-content font-bold border-none shadow-md shadow-primary/20 active:scale-95 transition-transform min-h-11">Sign up</Link>
               </div>
             )}
           </div>
@@ -173,7 +179,7 @@ const Navbar = () => {
                       </div>
                       <div>
                         <div className="font-bold">{authUser?.name || 'User'}</div>
-                        <div className="text-xs text-base-content/60">{authUser?.email}</div>
+                        <div className="text-xs text-base-content/70">{authUser?.email}</div>
                       </div>
                     </div>
                     <Link to="/dashboard" className="btn btn-ghost justify-start font-semibold text-lg">Dashboard</Link>
@@ -199,7 +205,7 @@ const Navbar = () => {
                 ) : (
                   <>
                     <Link to="/login" className="btn btn-ghost btn-lg justify-start font-semibold active:scale-95 transition-transform min-h-11">Log in</Link>
-                    <Link to="/register" className="btn btn-primary btn-lg text-white font-bold rounded-xl mt-2 shadow-primary/20 shadow-lg active:scale-95 transition-transform min-h-11">Create Account</Link>
+                    <Link to="/register" className="btn btn-primary btn-lg text-primary-content font-bold rounded-xl mt-2 shadow-primary/20 shadow-lg active:scale-95 transition-transform min-h-11">Create Account</Link>
                     <Link to="/privacy" className="btn btn-ghost justify-start font-semibold active:scale-95 transition-transform min-h-11">Privacy</Link>
                   </>
                 )}

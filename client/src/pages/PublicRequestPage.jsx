@@ -73,12 +73,12 @@ const AccountActions = ({ isSignedIn, note }) => (
   <div className="border-t border-base-300 bg-base-200/50 p-6 sm:p-8 space-y-4">
     <p className="text-sm text-base-content/70 leading-relaxed">{note}</p>
     {isSignedIn ? (
-      <Link to="/dashboard" className="btn btn-primary w-full min-h-11 h-auto py-2 rounded-xl text-white font-bold border-none shadow-lg shadow-primary/20">
+      <Link to="/dashboard" className="btn btn-primary w-full min-h-11 h-auto py-2 rounded-xl text-primary-content font-bold border-none shadow-lg shadow-primary/20">
         Open dashboard
       </Link>
     ) : (
       <div className="flex flex-col sm:flex-row gap-3">
-        <Link to="/register" className="btn btn-primary flex-1 min-h-11 h-auto py-2 rounded-xl text-white font-bold border-none shadow-lg shadow-primary/20">
+        <Link to="/register" className="btn btn-primary flex-1 min-h-11 h-auto py-2 rounded-xl text-primary-content font-bold border-none shadow-lg shadow-primary/20">
           Sign up to donate
         </Link>
         <Link to="/login" className="btn flex-1 min-h-11 h-auto py-2 rounded-xl font-semibold bg-base-100 border-base-300 hover:bg-base-200">

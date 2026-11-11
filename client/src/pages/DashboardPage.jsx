@@ -605,7 +605,7 @@ const DashboardPage = () => {
         </div>
         
         <div className="hidden lg:flex items-center gap-4 z-10 relative w-full sm:w-auto">
-          <Link to="/create-request" className="btn btn-primary rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none w-full sm:w-auto active:scale-95 transition-transform">
+          <Link to="/create-request" className="btn btn-primary rounded-xl text-primary-content font-bold shadow-lg shadow-primary/20 border-none w-full sm:w-auto active:scale-95 transition-transform">
             <PlusIcon weight="bold" className="w-5 h-5 mr-1" />
             Request Blood
           </Link>
@@ -628,7 +628,7 @@ const DashboardPage = () => {
           brings it back. */}
       {!selectedRequestId && (
         <div className="lg:hidden fixed bottom-6 right-6 z-40">
-          <Link to="/create-request" className="btn btn-primary btn-circle w-14 h-14 shadow-lg shadow-primary/30 glow-primary text-white flex items-center justify-center active:scale-90 transition-transform">
+          <Link to="/create-request" className="btn btn-primary btn-circle w-14 h-14 shadow-lg shadow-primary/30 glow-primary text-primary-content flex items-center justify-center active:scale-90 transition-transform">
             <PlusIcon weight="bold" className="w-7 h-7" />
           </Link>
         </div>
@@ -660,7 +660,7 @@ const DashboardPage = () => {
       <div className={`flex justify-center sm:justify-start ${selectedRequestId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="bg-base-100 border border-base-300 p-1.5 rounded-2xl inline-flex shadow-sm w-full sm:w-auto relative">
           <button 
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 min-[390px]:px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'incoming' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 min-[390px]:px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'incoming' ? 'text-primary-content' : 'text-base-content/60 hover:text-base-content'}`}
             onClick={() => { setActiveTab('incoming'); setSelectedRequestId(null); }}
           >
             {activeTab === 'incoming' && (
@@ -675,7 +675,7 @@ const DashboardPage = () => {
             <span className="relative z-10">Incoming Matches</span>
           </button>
           <button 
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 min-[390px]:px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'mine' ? 'text-white' : 'text-base-content/60 hover:text-base-content'}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 min-[390px]:px-6 py-2.5 rounded-xl font-bold transition-all relative z-10 ${activeTab === 'mine' ? 'text-primary-content' : 'text-base-content/60 hover:text-base-content'}`}
             onClick={() => { setActiveTab('mine'); setSelectedRequestId(null); }}
           >
             {activeTab === 'mine' && (
@@ -749,7 +749,7 @@ const DashboardPage = () => {
                                     Rated {req.rating}/5 by the requester
                                   </p>
                                   {req.ratingNote && (
-                                    <p className="text-sm italic text-base-content/60 mt-2">"{req.ratingNote}"</p>
+                                    <p className="text-sm italic text-base-content/70 mt-2">"{req.ratingNote}"</p>
                                   )}
                                 </div>
                               ) : req.requesterId === null ? (
@@ -804,11 +804,11 @@ const DashboardPage = () => {
                                   <>
                                     {isResting ? (
                                       // A row of its own, so both buttons stay together below it
-                                      <span className="w-full text-xs text-base-content/60 font-medium">
+                                      <span className="w-full text-xs text-base-content/70 font-medium">
                                         You can donate from <span className="whitespace-nowrap">{formatIndiaDate(nextEligibleDonationAt)}</span>
                                       </span>
                                     ) : (
-                                      <span className="text-xs text-base-content/30 font-medium self-center mr-2 md:hidden">
+                                      <span className="text-xs text-base-content/70 font-medium self-center mr-2 md:hidden">
                                         Swipe or tap →
                                       </span>
                                     )}
@@ -945,12 +945,12 @@ const DashboardPage = () => {
                                     <span className="text-sm font-semibold text-base-content/70">{req.rating}/5</span>
                                   </div>
                                   {req.ratingNote && (
-                                    <span className="text-xs italic text-base-content/50 sm:ml-auto truncate max-w-full sm:max-w-37.5" title={req.ratingNote}>"{req.ratingNote}"</span>
+                                    <span className="text-xs italic text-base-content/70 sm:ml-auto truncate max-w-full sm:max-w-37.5" title={req.ratingNote}>"{req.ratingNote}"</span>
                                   )}
                                 </div>
                               ) : !req.matchedDonorId ? (
                                 /* The donor deleted their account; the server refuses a rating too */
-                                <p className="text-xs text-base-content/50">
+                                <p className="text-xs text-base-content/70">
                                   Donated by Deleted user. This donation can't be rated.
                                 </p>
                               ) : ratingRequestId === req._id ? (
@@ -965,7 +965,7 @@ const DashboardPage = () => {
                                   <input
                                     type="text"
                                     placeholder="Optional: leave a note for the donor..."
-                                    className="input input-sm w-full rounded-lg border-base-300 text-base"
+                                    className="input input-sm w-full rounded-lg border-base-300 focus:border-primary focus:ring-1 focus:ring-primary text-base"
                                     value={ratingNote}
                                     onChange={(e) => setRatingNote(e.target.value)}
                                     maxLength={500}
@@ -1026,7 +1026,7 @@ const DashboardPage = () => {
             const backToRequestsButton = (
               <button
                 onClick={() => setSelectedRequestId(null)}
-                className="lg:hidden shrink-0 whitespace-nowrap text-primary font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
+                className="lg:hidden shrink-0 whitespace-nowrap text-primary-strong font-bold text-sm bg-primary/10 px-3 py-1 rounded-full active:scale-95 transition-transform"
               >
                 ← Back to Requests
               </button>
@@ -1069,7 +1069,7 @@ const DashboardPage = () => {
                     {backToRequestsButton}
                   </div>
                 )}
-                <div className="h-125 bg-base-100 rounded-xl border border-base-300 flex items-center justify-center text-base-content/50 text-center p-8">
+                <div className="h-125 bg-base-100 rounded-xl border border-base-300 flex items-center justify-center text-base-content/70 text-center p-8">
                   <div>
                     <div className="text-4xl mb-4">💬</div>
                     <h3 className="font-bold text-lg mb-2">Coordination Chat</h3>
