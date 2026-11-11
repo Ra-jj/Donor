@@ -42,6 +42,11 @@ export default defineConfig({
       filename: 'sw.js',
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      // Of the app's two icons only the 192 one is precached: sw.js shows it on push notifications.
+      // The 512 one (1.1 MB) is only for installing the app, which needs a connection anyway, so
+      // precaching it only made every first visit download it.
+      includeManifestIcons: false,
+      includeAssets: ['pwa-192x192.png'],
       manifest: {
         name: 'Donor - Blood Match',
         short_name: 'Donor',

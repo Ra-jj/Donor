@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform } from 'motion/react';
+import { m, useScroll, useTransform } from 'motion/react';
 import { 
   UserPlusIcon, HandHeartIcon, CheckCircleIcon, ArrowRightIcon, DropIcon,
   LightningIcon, ChatCircleDotsIcon, MapPinIcon,
@@ -46,7 +46,7 @@ const STATS = [
 
 /** Stat that fades in once it scrolls into view */
 const AnimatedStat = ({ value, label }) => (
-  <motion.div
+  <m.div
     initial={{ opacity: 0, y: 16 }}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
@@ -57,7 +57,7 @@ const AnimatedStat = ({ value, label }) => (
       {value}
     </div>
     <div className="text-sm text-base-content/70 font-medium mt-1">{label}</div>
-  </motion.div>
+  </m.div>
 );
 
 const isCount = (value) => Number.isInteger(value) && value >= 0;
@@ -103,7 +103,7 @@ const formatCount = (value) => value.toLocaleString('en-IN');
 // numbers line up however the labels wrap), and after it for a screen reader, as a dl wants.
 const PublicTotals = ({ totals }) => (
   <section aria-labelledby="public-totals-heading" className="pb-24 md:pb-32">
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
@@ -129,7 +129,7 @@ const PublicTotals = ({ totals }) => (
       <p className="mt-8 text-sm text-base-content/70 max-w-md mx-auto leading-relaxed">
         Counted from Donor's own records. Everyone registered can give blood or ask for it.
       </p>
-    </motion.div>
+    </m.div>
   </section>
 );
 
@@ -178,7 +178,7 @@ const HomePage = () => {
       <section className="relative min-h-[92vh] flex flex-col justify-center items-center text-center px-4 pt-20 pb-16">
         {/* Subtle background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div 
+          <m.div 
             style={{ y: backgroundY }}
             className="absolute top-1/4 left-1/2 -translate-x-1/2 w-150 h-150 rounded-full bg-primary/3 blur-3xl"
           />
@@ -187,7 +187,7 @@ const HomePage = () => {
 
         <div className="relative z-10 max-w-3xl mx-auto">
           {/* Badge */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -195,14 +195,14 @@ const HomePage = () => {
           >
             <HeartbeatIcon weight="fill" className="w-4 h-4" />
             <span>Saving lives, one match at a time</span>
-          </motion.div>
+          </m.div>
 
           {/* Headline — staggered word reveal */}
-          <motion.h1
+          <m.h1
             className="text-4xl md:text-5xl lg:text-7xl font-display font-extrabold text-base-content leading-[1.08] tracking-tight mb-6"
           >
             {["Find", "blood", "donors"].map((word, i) => (
-              <motion.span
+              <m.span
                 key={word}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -210,11 +210,11 @@ const HomePage = () => {
                 className="inline-block mr-[0.3em]"
               >
                 {word}
-              </motion.span>
+              </m.span>
             ))}
             <br className="hidden md:block" />
             {["in", "real", "time."].map((word, i) => (
-              <motion.span
+              <m.span
                 key={word}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -222,22 +222,22 @@ const HomePage = () => {
                 className={`inline-block mr-[0.3em] ${word === "time." ? "text-primary" : ""}`}
               >
                 {word}
-              </motion.span>
+              </m.span>
             ))}
-          </motion.h1>
+          </m.h1>
 
           {/* Subheadline */}
-          <motion.p
+          <m.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.8 }}
             className="text-lg md:text-xl text-base-content/70 max-w-xl mx-auto mb-10 leading-relaxed font-body font-normal"
           >
             A fast, direct way to ask for blood near a hospital and reach compatible donors nearby.
-          </motion.p>
+          </m.p>
 
           {/* CTAs */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 1 }}
@@ -256,10 +256,10 @@ const HomePage = () => {
             >
               Log in
             </Link>
-          </motion.div>
+          </m.div>
 
           {/* Stats */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 1.2 }}
@@ -268,7 +268,7 @@ const HomePage = () => {
             {STATS.map((stat) => (
               <AnimatedStat key={stat.label} value={stat.value} label={stat.label} />
             ))}
-          </motion.div>
+          </m.div>
         </div>
       </section>
 
@@ -277,7 +277,7 @@ const HomePage = () => {
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {TRUST_ITEMS.map((item, index) => (
-              <motion.div
+              <m.div
                 key={item.label}
                 initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -289,7 +289,7 @@ const HomePage = () => {
                   <item.icon weight="duotone" className="w-5 h-5 text-primary" />
                 </div>
                 <span className="text-sm font-semibold text-base-content/60">{item.label}</span>
-              </motion.div>
+              </m.div>
             ))}
           </div>
         </div>
@@ -298,7 +298,7 @@ const HomePage = () => {
       {/* ══════════════════ HOW IT WORKS ══════════════════ */}
       <section className="py-24 md:py-32">
         <div className="container mx-auto px-4 max-w-5xl">
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
@@ -311,14 +311,14 @@ const HomePage = () => {
             <p className="text-base-content/70 max-w-md mx-auto font-normal">
               Three simple steps to bridge the gap between critical shortages and willing donors.
             </p>
-          </motion.div>
+          </m.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 relative">
             {/* Connecting line (desktop only) */}
             <div className="hidden md:block absolute top-12 left-[16.66%] right-[16.66%] h-px bg-base-300" />
             
             {STEPS.map((step, index) => (
-              <motion.div
+              <m.div
                 key={index}
                 initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -334,7 +334,7 @@ const HomePage = () => {
                 <p className="text-base-content/70 text-sm leading-relaxed">
                   {step.description}
                 </p>
-              </motion.div>
+              </m.div>
             ))}
           </div>
         </div>
@@ -348,7 +348,7 @@ const HomePage = () => {
       {/* No top padding: "How it works" above has the same background, and its bottom padding is the gap */}
       <section className="pb-24 md:pb-32">
         <div className="container mx-auto px-4 max-w-3xl">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -379,7 +379,7 @@ const HomePage = () => {
                 <ArrowRightIcon weight="bold" className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       </section>
 

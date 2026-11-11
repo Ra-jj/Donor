@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import { useThemeStore } from './store/useThemeStore';
 import { Toaster } from 'react-hot-toast';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,7 +11,7 @@ import OfflineOverlay from './components/OfflineOverlay';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { lazyPage } from './lib/lazyPage';
 import { runWhenIdle } from './lib/runWhenIdle';
-import { reloadForNewBuildOnRouteChange } from './lib/serviceWorkerUpdate';
+import { registerServiceWorker, reloadForNewBuildOnRouteChange } from './lib/serviceWorkerUpdate';
 
 // Pages, each in its own chunk so a first visit downloads only the page it opens
 const HomePage = lazyPage(() => import('./pages/HomePage'));
@@ -86,7 +86,7 @@ const preloadPage = (page) =>
 // load shows a moment of empty page area rather than a flashing spinner.
 const PageLoadingFallback = () => (
   <div className="flex items-center justify-center min-h-[50vh]">
-    <motion.span
+    <m.span
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.3, duration: 0.3 }}
@@ -95,13 +95,13 @@ const PageLoadingFallback = () => (
   </div>
 );
 
-// Animated page wrapper for smooth route transitions. Suspense sits outside the motion.div, so
+// Animated page wrapper for smooth route transitions. Suspense sits outside the m.div, so
 // while a page's chunk loads only the fallback shows, and the enter animation then plays on the
 // real page instead of on a spinner.
 const PageTransition = ({ children, className = '' }) => (
   <RouteErrorBoundary>
     <Suspense fallback={<PageLoadingFallback />}>
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
@@ -109,13 +109,13 @@ const PageTransition = ({ children, className = '' }) => (
         className={className}
       >
         {children}
-      </motion.div>
+      </m.div>
     </Suspense>
   </RouteErrorBoundary>
 );
 
 function App() {
-  const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
+  const { authUser, checkAuth, isCheckingAuth, checkedUser } = useAuthStore();
   const { initTheme } = useThemeStore();
   const location = useLocation();
   // The spinner also waits for the chunk of the first page shown (after any auth redirect), so
@@ -145,6 +145,14 @@ function App() {
     const page = PAGE_BY_PATH[routeKeyFor(location.pathname)];
     if (page) preloadPage(page);
   }, [location.pathname]);
+
+  // A signed-in user's page starts downloading as soon as /auth/check answers, alongside the socket
+  // code checkAuth then waits for, instead of after it. The effect below waits for the same page.
+  useEffect(() => {
+    if (!checkedUser || isFirstPageSettled) return;
+    const page = pageShownFor(location.pathname, checkedUser);
+    if (page) preloadPage(page);
+  }, [checkedUser, isFirstPageSettled, location.pathname]);
 
   // First load: once auth is known, wait for the page that will really show. A redirect (e.g. a
   // logged-in user opening /, the installed app's start page) needs a different chunk than the URL.
@@ -181,16 +189,23 @@ function App() {
     };
   }, [isFirstPageSettled, location.pathname]);
 
+  // On a first visit, registering the service worker makes it download the whole app for offline
+  // use, so like the prefetch above it waits until the first page is shown and the browser is idle
+  useEffect(() => {
+    if (!isFirstPageSettled) return;
+    return runWhenIdle(registerServiceWorker);
+  }, [isFirstPageSettled]);
+
   if (isCheckingAuth || !isFirstPageSettled) {
     return (
       <div className="flex items-center justify-center h-screen bg-base-100">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
         >
           <span className="loading loading-spinner loading-lg text-primary"></span>
-        </motion.div>
+        </m.div>
       </div>
     );
   }

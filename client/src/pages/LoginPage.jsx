@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { EnvelopeSimpleIcon, LockIcon, SignInIcon, EyeIcon, EyeSlashIcon, DropIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import { showLoginPageMessage } from '../lib/loginPageMessage';
@@ -47,7 +47,7 @@ const LoginPage = () => {
 
   return (
     <div className="flex justify-center items-center min-h-[calc(100vh-6rem)] px-4">
-      <motion.div 
+      <m.div 
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
@@ -55,7 +55,7 @@ const LoginPage = () => {
       >
         <div className="card-body p-8 sm:p-10">
           {/* Header */}
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.15, duration: 0.4 }}
@@ -66,11 +66,11 @@ const LoginPage = () => {
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Welcome back</h2>
             <p className="text-base-content/70 mt-2 font-normal text-sm">Log in to your Donor account</p>
-          </motion.div>
+          </m.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.4 }}
@@ -96,18 +96,18 @@ const LoginPage = () => {
                 />
               </div>
               {errors.email && (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.email}
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Password */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.4 }}
@@ -138,18 +138,18 @@ const LoginPage = () => {
                 </button>
               </div>
               {errors.password && (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.password}
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Submit */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.4 }}
@@ -163,10 +163,10 @@ const LoginPage = () => {
                   </>
                 )}
               </button>
-            </motion.div>
+            </m.div>
           </form>
 
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.4 }}
@@ -179,9 +179,9 @@ const LoginPage = () => {
             <p className="mt-3 text-sm">
               <Link to="/privacy" className="text-base-content/60 font-medium underline hover:text-primary">Privacy Notice</Link>
             </p>
-          </motion.div>
+          </m.div>
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 };

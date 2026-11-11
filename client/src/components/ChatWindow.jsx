@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import { axiosInstance } from '../lib/axios';
 import toast from 'react-hot-toast';
@@ -137,7 +137,7 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
   }
 
   return (
-    <motion.div 
+    <m.div 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35 }}
@@ -163,7 +163,7 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
           messages.map((msg, index) => {
             const isMe = msg.senderId === currentUserId;
             return (
-              <motion.div 
+              <m.div 
                 key={msg._id} 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -176,7 +176,7 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
                 <div className="chat-footer opacity-70 text-xs mt-1 font-medium">
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </div>
-              </motion.div>
+              </m.div>
             );
           })
         )}
@@ -192,7 +192,7 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <motion.button 
+        <m.button 
           type="submit" 
           className="btn btn-primary btn-circle shadow-lg shadow-primary/20 border-none" 
           disabled={!text.trim()}
@@ -200,9 +200,9 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
           transition={{ duration: 0.1 }}
         >
           <PaperPlaneRightIcon weight="fill" className="w-5 h-5" />
-        </motion.button>
+        </m.button>
       </form>
-    </motion.div>
+    </m.div>
   );
 };
 

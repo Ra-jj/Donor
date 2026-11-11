@@ -5,7 +5,7 @@ import { axiosInstance } from '../lib/axios';
 import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
 import { getSocket, hasSocketConnectedBefore, hadFailedAttempt } from '../lib/socket';
 import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { m, AnimatePresence, LazyMotion, domMax } from 'motion/react';
 import ChatWindow from '../components/ChatWindow';
 import StatsCard from '../components/StatsCard';
 import StarRating from '../components/StarRating';
@@ -97,7 +97,7 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
   if (req.status !== 'pending') {
     // Non-pending cards are not swipeable
     return (
-      <motion.div
+      <m.div
         layout
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -109,12 +109,12 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
         } ${isSelected ? 'border-primary ring-2 ring-primary/50' : ''}`}
       >
         {children}
-      </motion.div>
+      </m.div>
     );
   }
 
   return (
-    <motion.div
+    <m.div
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
@@ -133,7 +133,7 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
         </div>
       </div>
 
-      <motion.div
+      <m.div
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         // A busy donor can still swipe left to decline, but the card will not move right
@@ -156,8 +156,8 @@ const SwipeableRequestCard = ({ req, onAccept, onDecline, onSelect, isSelected, 
       >
         <div className="h-1 w-full bg-error" />
         {children}
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 };
 
@@ -590,7 +590,7 @@ const DashboardPage = () => {
     // button sits below its buttons instead of on them
     <div className="space-y-8 pt-20 max-lg:pb-20">
       {/* Header Profile Section */}
-      <motion.div 
+      <m.div 
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -610,17 +610,17 @@ const DashboardPage = () => {
             Request Blood
           </Link>
         </div>
-      </motion.div>
+      </m.div>
 
       {/* Your Impact Stats Card */}
       {stats && (stats.donor.livesSaved > 0 || stats.requester.totalCreated > 0) && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
           <StatsCard donorStats={stats.donor} requesterStats={stats.requester} />
-        </motion.div>
+        </m.div>
       )}
 
       {/* Mobile FAB. Not while a request is selected: below lg its chat then takes the place of the
@@ -636,7 +636,7 @@ const DashboardPage = () => {
 
       {/* Push Notification Banner */}
       {'Notification' in window && !pushEnabled && (
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-info/10 border border-info/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4"
@@ -651,7 +651,7 @@ const DashboardPage = () => {
             </div>
           </div>
           <button onClick={enablePushNotifications} className="btn btn-info btn-sm rounded-lg text-base-100 font-semibold">Enable Now</button>
-        </motion.div>
+        </m.div>
       )}
 
       {/* The switch between the two request views, its red fill sliding to the chosen one.
@@ -664,7 +664,7 @@ const DashboardPage = () => {
             onClick={() => { setActiveTab('incoming'); setSelectedRequestId(null); }}
           >
             {activeTab === 'incoming' && (
-              <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
+              <m.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
             )}
             {incomingRequests.filter(r => r.status === 'pending').length > 0 && (
               <span className={`px-2 py-0.5 rounded-full text-xs font-bold mr-1 ${activeTab === 'incoming' ? 'bg-base-100 text-base-content' : 'bg-error text-base-100'}`}>
@@ -679,7 +679,7 @@ const DashboardPage = () => {
             onClick={() => { setActiveTab('mine'); setSelectedRequestId(null); }}
           >
             {activeTab === 'mine' && (
-              <motion.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
+              <m.div layoutId="active-tab-indicator" className="absolute inset-0 bg-primary rounded-xl shadow-md -z-10" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />
             )}
             <ClockClockwiseIcon weight={activeTab === 'mine' ? "fill" : "regular"} className="w-5 h-5 max-[360px]:hidden" />
             <span className="relative z-10">My Requests</span>
@@ -693,7 +693,7 @@ const DashboardPage = () => {
         <div className={`space-y-4 ${selectedRequestId ? 'hidden lg:block' : 'block'}`}>
           <AnimatePresence mode="wait">
             {activeTab === 'incoming' && (
-              <motion.div
+              <m.div
                 key="incoming"
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -835,11 +835,11 @@ const DashboardPage = () => {
                     ))}
                   </AnimatePresence>
                 )}
-              </motion.div>
+              </m.div>
             )}
 
             {activeTab === 'mine' && (
-              <motion.div
+              <m.div
                 key="mine"
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -855,7 +855,7 @@ const DashboardPage = () => {
                 ) : (
                   <AnimatePresence>
                     {myRequests.map(req => (
-                      <motion.div 
+                      <m.div 
                         key={req._id}
                         layout
                         initial={{ opacity: 0, y: 12 }}
@@ -955,7 +955,7 @@ const DashboardPage = () => {
                                 </p>
                               ) : ratingRequestId === req._id ? (
                                 /* Rating form is open */
-                                <motion.div
+                                <m.div
                                   initial={{ opacity: 0, height: 0 }}
                                   animate={{ opacity: 1, height: 'auto' }}
                                   className="bg-base-200/50 border border-base-300 rounded-xl p-4 space-y-3 text-center"
@@ -985,7 +985,7 @@ const DashboardPage = () => {
                                       {ratingLoading ? <span className="loading loading-spinner loading-xs"></span> : 'Submit Rating'}
                                     </button>
                                   </div>
-                                </motion.div>
+                                </m.div>
                               ) : (
                                 /* Not yet rated — show rate button. The open form above keeps the full
                                    width: at 320 px, 52 px less would wrap "Submit Rating". */
@@ -1002,11 +1002,11 @@ const DashboardPage = () => {
                             </div>
                           )}
                         </div>
-                      </motion.div>
+                      </m.div>
                     ))}
                   </AnimatePresence>
                 )}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
@@ -1034,7 +1034,7 @@ const DashboardPage = () => {
 
             if (activeChatRequest && activeChatRequest.status === 'accepted') {
               return (
-                <motion.div 
+                <m.div 
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3 }}
@@ -1059,7 +1059,7 @@ const DashboardPage = () => {
                       />
                     }
                   />
-                </motion.div>
+                </m.div>
               );
             }
             return (
@@ -1100,4 +1100,12 @@ const DashboardPage = () => {
   );
 };
 
-export default DashboardPage;
+// main.jsx gives every page motion's animations. This one also drags its request cards and slides
+// the marker under the selected list (layout), and the code for those two comes with this page.
+const DashboardPageWithDragAndLayout = () => (
+  <LazyMotion features={domMax} strict>
+    <DashboardPage />
+  </LazyMotion>
+);
+
+export default DashboardPageWithDragAndLayout;
