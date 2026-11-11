@@ -132,9 +132,9 @@ const DonorMap = ({
             <Marker key={index} position={[lat, lng]} icon={donorIcon}>
               {interactive && (
                 <Popup>
-                  <div className="font-bold text-primary mb-1">Compatible donor nearby (approximate location)</div>
+                  <div className="font-bold text-primary-strong mb-1">Compatible donor nearby (approximate location)</div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-success flex items-center gap-1">
+                    <span className="text-xs font-semibold text-success-strong flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
                       Available
                     </span>

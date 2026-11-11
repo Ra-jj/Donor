@@ -186,7 +186,7 @@ const RegisterPage = () => {
               <DropIcon weight="duotone" className="w-7 h-7" />
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Create Account</h2>
-            <p className="text-base-content/50 mt-2 font-normal text-sm">Join Donor and start saving lives</p>
+            <p className="text-base-content/70 mt-2 font-normal text-sm">Join Donor and start saving lives</p>
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -288,7 +288,7 @@ const RegisterPage = () => {
                 />
                 <button 
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/30 hover:text-primary transition-colors focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/70 hover:text-primary transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeSlashIcon weight="regular" className="h-5 w-5" /> : <EyeIcon weight="regular" className="h-5 w-5" />}
@@ -303,7 +303,7 @@ const RegisterPage = () => {
                   {errors.password}
                 </motion.span>
               ) : (
-                <span className="text-base-content/40 text-xs mt-1.5 ml-1">At least 6 characters</span>
+                <span className="text-base-content/70 text-xs mt-1.5 ml-1">At least 6 characters</span>
               )}
             </motion.div>
 
@@ -360,17 +360,19 @@ const RegisterPage = () => {
                 Search sends the place you type to OpenStreetMap.
               </p>
               <div className="flex flex-col gap-3">
+                {/* Once set, the green is in the fill, edge and icon and the words in the page's text
+                    colour, as on the dashboard: white on the green measured 3.3:1 (light) and 1.7:1 (dark) */}
                 <button
                   type="button"
-                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.location ? 'btn-success text-white border-success' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary'}`}
+                  className={`btn w-full rounded-xl font-bold border-2 transition-all active:scale-98 ${formData.location ? 'bg-success/10 border-success/40 hover:bg-success/20 text-base-content' : 'btn-outline border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary-strong'}`}
                   onClick={handleGetLocation}
                   aria-describedby="register-location-help"
                 >
-                  <MapPinIcon weight={formData.location ? "fill" : "regular"} className="w-5 h-5 mr-2" />
+                  <MapPinIcon weight={formData.location ? "fill" : "regular"} className={`w-5 h-5 mr-2 ${formData.location ? 'text-success' : ''}`} />
                   {formData.location ? 'Location Captured ✓' : 'Click to Get Current Location'}
                 </button>
 
-                <div className="divider text-xs text-base-content/40 my-0 uppercase">Or Enter Manually</div>
+                <div className="divider text-xs text-base-content/70 my-0 uppercase">Or Enter Manually</div>
 
                 <div className="flex gap-2">
                   <input 
@@ -415,7 +417,7 @@ const RegisterPage = () => {
                 <motion.span 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-xs font-semibold text-success mt-3 text-center"
+                  className="text-xs font-semibold text-success-strong mt-3 text-center"
                 >
                   Coordinates: {formData.location[0].toFixed(4)}, {formData.location[1].toFixed(4)}
                 </motion.span>
@@ -453,7 +455,7 @@ const RegisterPage = () => {
               transition={fieldDelay(6)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-primary-content font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Create Account'}
               </button>
             </motion.div>
@@ -465,7 +467,7 @@ const RegisterPage = () => {
             transition={{ delay: 0.65, duration: 0.4 }}
             className="text-center mt-8"
           >
-            <p className="text-base-content/50 text-sm font-medium">
+            <p className="text-base-content/70 text-sm font-medium">
               Already have an account?{' '}
               <Link to="/login" className="text-primary font-bold hover:underline">Log in</Link>
             </p>

@@ -42,7 +42,7 @@ const PrivacySummary = ({ headingLevel = 3 }) => {
         to="/privacy"
         target="_blank"
         rel="noopener"
-        className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary underline min-h-11"
+        className="mt-3 inline-flex items-center gap-1.5 font-semibold text-primary-strong underline min-h-11"
       >
         Read the full Privacy Notice
         <ArrowSquareOutIcon weight="bold" className="w-4 h-4 shrink-0" aria-hidden="true" />

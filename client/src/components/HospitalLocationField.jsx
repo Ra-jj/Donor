@@ -252,7 +252,7 @@ const HospitalLocationField = ({ location, onPlacePicked, onLocationChange, erro
                     {place.name}
                   </span>
                   {place.addressLine && (
-                    <span className="block text-sm text-base-content/60 wrap-anywhere">{place.addressLine}</span>
+                    <span className="block text-sm text-base-content/70 wrap-anywhere">{place.addressLine}</span>
                   )}
                 </span>
               </button>
@@ -312,10 +312,10 @@ const HospitalLocationField = ({ location, onPlacePicked, onLocationChange, erro
         </motion.div>
       )}
 
-      <div className="divider text-xs text-base-content/40 my-2">or</div>
+      <div className="divider text-xs text-base-content/70 my-2">or</div>
       <button
         type="button"
-        className="btn btn-sm btn-outline w-full sm:w-auto h-auto whitespace-normal py-2 rounded-xl font-semibold border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary active:scale-98 transition-all"
+        className="btn btn-sm btn-outline w-full sm:w-auto h-auto whitespace-normal py-2 rounded-xl font-semibold border-base-300 hover:border-primary hover:bg-primary/5 hover:text-primary-strong active:scale-98 transition-all"
         onClick={handleUseDeviceLocation}
         disabled={disabled}
         aria-describedby={DEVICE_NOTE_ID}

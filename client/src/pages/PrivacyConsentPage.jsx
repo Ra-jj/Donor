@@ -88,7 +88,7 @@ const PrivacyConsentPage = () => {
             <button
               type="submit"
               disabled={isSaving}
-              className="btn btn-primary w-full rounded-xl text-white font-bold h-12 text-base"
+              className="btn btn-primary w-full rounded-xl text-primary-content font-bold h-12 text-base"
             >
               {isSaving ? <span className="loading loading-spinner" aria-hidden="true"></span> : 'Continue'}
               {isSaving && <span className="sr-only">Saving</span>}
@@ -100,7 +100,7 @@ const PrivacyConsentPage = () => {
               type="button"
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={isSaving}
-              className="btn btn-ghost rounded-xl text-error font-semibold px-3 min-h-11"
+              className="btn btn-ghost rounded-xl text-error hover:text-error-strong font-semibold px-3 min-h-11"
             >
               <TrashIcon weight="bold" className="w-5 h-5" aria-hidden="true" />
               Delete my account instead

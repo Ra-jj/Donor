@@ -14,6 +14,13 @@
 @theme {
   --font-display: "Space Grotesk", sans-serif;
   --font-body: "Inter", sans-serif;
+  /* The -strong colours are for words, numbers and small icons: each theme block below sets them to
+     the shade of that colour which reads at 4.5:1 or more on the theme's surfaces and tints. These
+     are the light theme's values, here so text-primary-strong and the rest exist. */
+  --color-primary-strong: #B91C1C;
+  --color-error-strong: #B91C1C;
+  --color-success-strong: #15803D;
+  --color-warning-strong: #B45309;
 }
 
 /* Light theme (default) */
@@ -25,15 +32,28 @@
   --color-base-300: #E7E5E4;
   --color-base-content: #1C1917;
   --color-error: #DC2626;
+  /* Words on a red error fill, as on an outlined error button under the pointer: daisyUI's own dark
+     red measured 2.76:1 there */
+  --color-error-content: #FFFFFF;
   --color-success: #16A34A;
   --color-warning: #D97706;
   --color-info: #2563EB;
+  /* Not set before, so daisyUI's pink showed, with light pink words at 3.04:1. A darker pink, 6.04:1 */
+  --color-secondary: #BE185D;
+  --color-secondary-content: #FFFFFF;
+  /* #B91C1C measured 4.85:1 or more on the light tints and hover greys; the error red, #DC2626, 3.62:1 */
+  --color-primary-strong: #B91C1C;
+  --color-error-strong: #B91C1C;
+  /* The success and warning fills measured 2.92:1 and 2.84:1 as words on their own tints */
+  --color-success-strong: #15803D;
+  --color-warning-strong: #B45309;
 }
 
 /* Dark theme */
 [data-theme="dark"] {
   --color-primary: #EF4444;
-  --color-primary-content: #FFFFFF;
+  /* Near-black words and icons on the red fill, 5.25:1. White measured 3.76:1 on #EF4444. */
+  --color-primary-content: #0C0A09;
   --color-base-100: #1C1917;
   --color-base-200: #292524;
   --color-base-300: #44403C;
@@ -42,6 +62,56 @@
   --color-success: #4ADE80;
   --color-warning: #FBBF24;
   --color-info: #60A5FA;
+  /* As with the red: a lighter pink under near-black words, 7.46:1, so its focus edge also stands
+     out on the dark surfaces (6.60:1) */
+  --color-secondary: #F472B6;
+  --color-secondary-content: #0C0A09;
+  /* #EF4444 as words measured 4.03:1 on base-200 and 3.64:1 on its own 10% tint; #F87171 is 5.49:1
+     and 4.96:1 there */
+  --color-primary-strong: #F87171;
+  --color-error-strong: #F87171;
+  --color-success-strong: #4ADE80;
+  --color-warning-strong: #FBBF24;
+}
+
+/* The next two rules set custom properties that daisyUI 5.7.43 reads inside its own rules (the fill
+   under the pointer, and the resting word colour of an outlined variant). They are not a public API:
+   package.json pins that exact version, and both rules must be checked again on any daisyUI upgrade. */
+
+/* In the dark theme a red fill turns lighter under the pointer, not darker: with the near-black
+   words above, daisyUI's 7% darker hover measured 4.41:1, and 8% lighter measures 5.95:1.
+   Unlayered, so it wins over daisyUI's own hover rule, as the theme blocks above do. */
+@media (hover: hover) {
+  [data-theme="dark"] .btn-primary:hover {
+    --btn-bg: color-mix(in oklab, var(--color-primary), #fff 8%);
+  }
+}
+
+/* An outlined red button's words while it is not hovered, in the -strong red: the plain red measured
+   4.03:1 on base-200 in the dark theme. Under the pointer daisyUI fills it and uses primary-content. */
+.btn-outline.btn-primary {
+  --btn-rest-fg: var(--color-primary-strong);
+}
+
+/* A red action that cannot be used yet (saving, sending, locating): grey words on daisyUI's grey
+   fill, measured 3.16:1 (light) and 4.29:1 (dark). The word colour classes on these elements would
+   otherwise win and leave primary-content on grey, 1.28:1 (light) and 1.49:1 (dark). */
+.btn-primary:is(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+
+/* Map popups in the dark theme: leaflet.css paints them white, under words in the dark theme's light
+   text colour. Unlayered, like leaflet.css, and more specific than its rules. */
+[data-theme="dark"] .leaflet-popup-content-wrapper,
+[data-theme="dark"] .leaflet-popup-tip {
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+}
+[data-theme="dark"] .leaflet-container a.leaflet-popup-close-button {
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+[data-theme="dark"] .leaflet-container a.leaflet-popup-close-button:is(:hover, :focus) {
+  color: var(--color-base-content);
 }
 
 @layer base {
@@ -66,6 +136,12 @@
   /* Custom focus-visible to override default blue outline for buttons/links */
   *:focus-visible {
     @apply outline-2 outline-offset-2 outline-primary;
+  }
+
+  /* The hint in an empty field, at 70% of its text colour like the pages' other quiet words.
+     Tailwind's 50% measured 3.3:1 on the light theme's fields. */
+  ::placeholder {
+    color: color-mix(in oklab, currentcolor 70%, transparent);
   }
 }
 

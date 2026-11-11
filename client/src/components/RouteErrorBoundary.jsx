@@ -70,7 +70,7 @@ class RouteErrorBoundary extends Component {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="btn btn-primary rounded-full px-8 text-white font-bold active:scale-95 transition-transform min-h-11"
+            className="btn btn-primary rounded-full px-8 text-primary-content font-bold active:scale-95 transition-transform min-h-11"
           >
             Reload page
           </button>

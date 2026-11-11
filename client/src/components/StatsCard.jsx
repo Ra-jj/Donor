@@ -30,19 +30,19 @@ const StatsCard = ({ donorStats, requesterStats }) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-success/5 border border-success/20 rounded-xl p-5 text-center">
-          <div className="text-4xl font-display font-bold text-success mb-1">
+          <div className="text-4xl font-display font-bold text-success-strong mb-1">
             <AnimatedCounter to={donorStats?.livesSaved || 0} format={(v) => Math.floor(v)} />
           </div>
-          <div className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
+          <div className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
             {donorStats?.livesSaved === 1 ? 'Life saved' : 'Lives saved'}
           </div>
         </div>
         <div className="bg-warning/5 border border-warning/20 rounded-xl p-5 text-center">
-          <div className="text-4xl font-display font-bold text-warning flex items-center justify-center gap-1 mb-1">
+          <div className="text-4xl font-display font-bold text-warning-strong flex items-center justify-center gap-1 mb-1">
             <AnimatedCounter to={donorStats?.avgRating || 0} format={(v) => v === 0 ? '-' : v.toFixed(1)} />
             <StarIcon weight="fill" className="w-6 h-6" />
           </div>
-          <div className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
+          <div className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
             Avg Rating ({donorStats?.totalRated || 0})
           </div>
         </div>
@@ -50,7 +50,7 @@ const StatsCard = ({ donorStats, requesterStats }) => {
           <div className="text-4xl font-display font-bold text-info mb-1">
             <AnimatedCounter to={requesterStats?.totalCreated || 0} format={(v) => Math.floor(v)} />
           </div>
-          <div className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Requests Made</div>
+          <div className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">Requests Made</div>
         </div>
       </div>
       {/* From the same count as Lives saved: donations completed through Donor */}

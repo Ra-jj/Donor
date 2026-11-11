@@ -159,7 +159,7 @@ const BlockedUsersSection = () => {
           Your blocked users couldn't be loaded. Reload the page to try again.
         </p>
       ) : blockedUsers.length === 0 ? (
-        <div className="text-center p-6 bg-base-200/50 rounded-2xl text-base-content/60">
+        <div className="text-center p-6 bg-base-200/50 rounded-2xl text-base-content/70">
           You haven't blocked anyone.
         </div>
       ) : (
@@ -169,7 +169,7 @@ const BlockedUsersSection = () => {
               <div className="min-w-0">
                 <div className="font-bold wrap-anywhere">{entry.name}</div>
                 {/* The day in India, wherever the browser is */}
-                <div className="text-sm text-base-content/60">
+                <div className="text-sm text-base-content/70">
                   Blocked on <span className="whitespace-nowrap">{formatIndiaDate(entry.blockedAt)}</span>
                 </div>
               </div>
@@ -374,7 +374,7 @@ const ProfilePage = () => {
               {formData.location && <span className="text-base-content text-xs font-bold">✓ Location Set</span>}
             </label>
             <div className="flex gap-2">
-              <div className="flex-1 input bg-base-200 rounded-xl flex items-center opacity-60">
+              <div className="flex-1 input bg-base-200 rounded-xl flex items-center opacity-70">
                 {formData.location ? `${formData.location[1].toFixed(4)}, ${formData.location[0].toFixed(4)}` : 'Not set'}
               </div>
               <button 
@@ -398,8 +398,8 @@ const ProfilePage = () => {
                 onChange={e => setFormData({...formData, isAvailable: e.target.checked})}
               />
               <div>
-                <span className="label-text font-bold text-base block mb-1">Available to donate (notify me of nearby requests)</span>
-                <span className="label-text-alt text-base-content/60 leading-relaxed block">
+                <span className="label-text font-bold text-base text-base-content block mb-1">Available to donate (notify me of nearby requests)</span>
+                <span className="label-text-alt text-base-content/70 leading-relaxed block">
                   Your choice. Turn this off to stop new request alerts and donation reminders. While you have an active donation, you get no new alerts either way.
                 </span>
               </div>
@@ -421,7 +421,7 @@ const ProfilePage = () => {
                     "You're eligible to donate"
                   )}
                 </p>
-                <p className="text-sm text-base-content/60 leading-relaxed">
+                <p className="text-sm text-base-content/70 leading-relaxed">
                   Donors wait {DONATION_GAP_DAYS} days between whole blood donations, counted from your last one.
                 </p>
               </div>
@@ -451,14 +451,14 @@ const ProfilePage = () => {
                   Clear
                 </button>
               </div>
-              <p id="last-outside-donation-help" className="text-xs text-base-content/60 leading-relaxed">
+              <p id="last-outside-donation-help" className="text-xs text-base-content/70 leading-relaxed">
                 Optional. A donation at a hospital or blood camp. Donations made through Donor are counted for you.
               </p>
             </div>
           </div>
 
           <div className="md:col-span-2 flex justify-end mt-4">
-            <button type="submit" disabled={loading || locating} className="btn btn-primary rounded-xl px-8 text-white font-bold shadow-lg shadow-primary/20">
+            <button type="submit" disabled={loading || locating} className="btn btn-primary rounded-xl px-8 text-primary-content font-bold shadow-lg shadow-primary/20">
               {loading ? <span className="loading loading-spinner"></span> : 'Save Changes'}
             </button>
           </div>
@@ -474,7 +474,7 @@ const ProfilePage = () => {
         </h2>
         
         {history.pastDonations.length === 0 && history.pastRequests.length === 0 ? (
-          <div className="text-center p-8 bg-base-200/50 rounded-2xl text-base-content/60">
+          <div className="text-center p-8 bg-base-200/50 rounded-2xl text-base-content/70">
             You don't have any completed donations or requests yet.
           </div>
         ) : (
@@ -488,7 +488,7 @@ const ProfilePage = () => {
                       <div className="min-w-0">
                         <div className="font-bold wrap-anywhere">{req.hospitalName}</div>
                         {/* requesterId is null once the requester has deleted their account. The day is India's. */}
-                        <div className="text-sm text-base-content/60">
+                        <div className="text-sm text-base-content/70">
                           For {req.requesterId?.name || 'Deleted user'} <span className="whitespace-nowrap">• {formatIndiaDate(req.fulfilledAt)}</span>
                         </div>
                       </div>
@@ -514,12 +514,12 @@ const ProfilePage = () => {
                     <div key={req._id} className="bg-base-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                       <div>
                         <div className="font-bold">{req.unitsNeeded} {req.unitsNeeded === 1 ? 'unit' : 'units'} of {req.bloodGroup}</div>
-                        <div className="text-sm text-base-content/60">
+                        <div className="text-sm text-base-content/70">
                           {/* matchedDonorId is null once the donor has deleted their account */}
                           {req.status === 'fulfilled' && <>Donated by {req.matchedDonorId?.name || 'Deleted user'} </>}
                           <span className="whitespace-nowrap">{req.status === 'fulfilled' && '• '}{formatIndiaDate(req.createdAt)}</span>
                         </div>
-                        {isReportedRequest(req) && <div className="text-sm text-base-content/60">{REPORTED_NOTE}</div>}
+                        {isReportedRequest(req) && <div className="text-sm text-base-content/70">{REPORTED_NOTE}</div>}
                       </div>
                       {isExpiredRequest(req) ? (
                         // Opens the New Request form filled in with this request's details, to send again

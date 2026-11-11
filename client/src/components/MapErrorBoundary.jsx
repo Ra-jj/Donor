@@ -22,7 +22,7 @@ class MapErrorBoundary extends Component {
     // divs, not p: daisyUI gives every p inside a card body flex-grow, which would spread these
     // lines over the whole map area on the create-request success screen
     return (
-      <div role="status" className={`${height} flex flex-col items-center justify-center gap-1 px-4 text-center text-base-content/60`}>
+      <div role="status" className={`${height} flex flex-col items-center justify-center gap-1 px-4 text-center text-base-content/70`}>
         <WarningCircleIcon weight="duotone" className="w-7 h-7 text-warning" />
         <div className="font-semibold text-base-content/80">Map couldn't load</div>
         <div className="text-sm">

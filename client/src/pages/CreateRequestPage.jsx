@@ -186,7 +186,7 @@ const CreateRequestPage = () => {
               {/* The request is already saved here, so a map failure must not reload or replace this screen */}
               <MapErrorBoundary height="h-100" note="Your request is live, so there's no need to send it again.">
                 <Suspense fallback={
-                  <div className="h-100 flex flex-col items-center justify-center text-base-content/50">
+                  <div className="h-100 flex flex-col items-center justify-center text-base-content/70">
                     <span className="loading loading-spinner loading-lg text-primary mb-4"></span>
                     <p>Loading live map...</p>
                   </div>
@@ -241,7 +241,7 @@ const CreateRequestPage = () => {
             </div>
 
             <div className="mt-8">
-              <Link to="/dashboard" className="btn btn-primary w-full min-h-14 h-auto py-2 rounded-xl text-lg text-white font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform">
+              <Link to="/dashboard" className="btn btn-primary w-full min-h-14 h-auto py-2 rounded-xl text-lg text-primary-content font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-transform">
                 Go to Dashboard
                 <ArrowRightIcon weight="bold" className="w-5 h-5 ml-1 shrink-0" />
               </Link>
@@ -272,7 +272,7 @@ const CreateRequestPage = () => {
               <HeartbeatIcon weight="duotone" className="w-8 h-8" />
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Request Blood</h2>
-            <p className="text-base-content/50 mt-3 font-normal text-sm max-w-sm mx-auto leading-relaxed">
+            <p className="text-base-content/70 mt-3 font-normal text-sm max-w-sm mx-auto leading-relaxed">
               Create an emergency broadcast. We'll notify compatible donors within a 15km radius immediately.
             </p>
           </motion.div>
@@ -448,7 +448,7 @@ const CreateRequestPage = () => {
               transition={fieldDelay(5)}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none min-h-14 h-auto py-2 leading-tight text-lg active:scale-98 transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-primary-content font-bold shadow-lg shadow-primary/20 border-none min-h-14 h-auto py-2 leading-tight text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency Request'}
               </button>
             </motion.div>

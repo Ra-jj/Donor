@@ -65,7 +65,7 @@ const LoginPage = () => {
               <DropIcon weight="duotone" className="w-7 h-7" />
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Welcome back</h2>
-            <p className="text-base-content/50 mt-2 font-normal text-sm">Log in to your Donor account</p>
+            <p className="text-base-content/70 mt-2 font-normal text-sm">Log in to your Donor account</p>
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -131,7 +131,7 @@ const LoginPage = () => {
                 />
                 <button 
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/30 hover:text-primary transition-colors focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-base-content/70 hover:text-primary transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeSlashIcon weight="regular" className="h-5 w-5" /> : <EyeIcon weight="regular" className="h-5 w-5" />}
@@ -155,7 +155,7 @@ const LoginPage = () => {
               transition={{ delay: 0.4, duration: 0.4 }}
               className="form-control mt-8"
             >
-              <button type="submit" className="btn btn-primary w-full rounded-xl text-white font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
+              <button type="submit" className="btn btn-primary w-full rounded-xl text-primary-content font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : (
                   <>
                     <SignInIcon weight="bold" className="w-5 h-5 mr-1" />
@@ -172,7 +172,7 @@ const LoginPage = () => {
             transition={{ delay: 0.5, duration: 0.4 }}
             className="text-center mt-8"
           >
-            <p className="text-base-content/50 text-sm font-medium">
+            <p className="text-base-content/70 text-sm font-medium">
               Don't have an account?{' '}
               <Link to="/register" className="text-primary font-bold hover:underline">Sign Up</Link>
             </p>

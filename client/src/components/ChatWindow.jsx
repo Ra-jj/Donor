@@ -155,7 +155,7 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-base-100/50">
         {messages.length === 0 ? (
-          <div className="text-center text-base-content/40 my-auto h-full flex flex-col items-center justify-center font-medium">
+          <div className="text-center text-base-content/70 my-auto h-full flex flex-col items-center justify-center font-medium">
             <ChatCircleDotsIcon weight="duotone" className="w-10 h-10 mb-3 text-base-content/15" />
             <p className="text-sm">No messages yet.<br/>Send a message to coordinate!</p>
           </div>
@@ -170,10 +170,10 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
                 transition={{ duration: 0.25, delay: index > messages.length - 3 ? 0.05 : 0 }}
                 className={`chat ${isMe ? 'chat-end' : 'chat-start'}`}
               >
-                <div className={`chat-bubble font-medium shadow-sm ${isMe ? 'chat-bubble-primary text-white' : 'bg-base-200 text-base-content'}`}>
+                <div className={`chat-bubble font-medium shadow-sm ${isMe ? 'chat-bubble-primary text-primary-content' : 'bg-base-200 text-base-content'}`}>
                   {msg.text}
                 </div>
-                <div className="chat-footer opacity-40 text-xs mt-1 font-medium">
+                <div className="chat-footer opacity-70 text-xs mt-1 font-medium">
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </div>
               </motion.div>
@@ -199,7 +199,7 @@ const ChatWindow = ({ requestId, currentUserId, headerAction = null }) => {
           whileTap={{ scale: 0.92 }}
           transition={{ duration: 0.1 }}
         >
-          <PaperPlaneRightIcon weight="fill" className="w-5 h-5 text-white" />
+          <PaperPlaneRightIcon weight="fill" className="w-5 h-5" />
         </motion.button>
       </form>
     </motion.div>
