@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { m, AnimatePresence } from 'motion/react';
 import { WifiSlashIcon, WarningCircleIcon } from '@phosphor-icons/react';
 
 const OfflineOverlay = () => {
@@ -21,7 +21,7 @@ const OfflineOverlay = () => {
   return (
     <AnimatePresence>
       {isOffline && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -52,7 +52,7 @@ const OfflineOverlay = () => {
               </p>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

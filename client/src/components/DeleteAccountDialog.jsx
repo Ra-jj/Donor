@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { TrashIcon, WarningOctagonIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -57,7 +57,7 @@ const DeleteAccountDialog = ({ onClose }) => {
       }}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-base-300 bg-base-100 text-base-content shadow-2xl backdrop:bg-[rgb(0_0_0/0.55)]"
     >
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
@@ -125,7 +125,7 @@ const DeleteAccountDialog = ({ onClose }) => {
             </button>
           </div>
         </form>
-      </motion.div>
+      </m.div>
     </dialog>
   );
 };

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import toast from 'react-hot-toast';
 import { ArrowLeftIcon, FlagIcon, ProhibitIcon, UserMinusIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
@@ -184,7 +184,7 @@ const ReportBlockDialog = ({ requestId, role, onClose, onChanged }) => {
       }}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-base-300 bg-base-100 text-base-content shadow-2xl backdrop:bg-[rgb(0_0_0/0.55)]"
     >
-      <motion.div
+      <m.div
         key={view}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -352,7 +352,7 @@ const ReportBlockDialog = ({ requestId, role, onClose, onChanged }) => {
             </div>
           </div>
         )}
-      </motion.div>
+      </m.div>
     </dialog>
   );
 };

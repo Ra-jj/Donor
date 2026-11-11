@@ -1,6 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { BuildingOfficeIcon, DropIcon, HeartbeatIcon, ArrowRightIcon, ArrowCounterClockwiseIcon } from '@phosphor-icons/react';
 import { axiosInstance } from '../lib/axios';
 import { loadDonorMap, preloadDonorMapWhenIdle } from '../lib/loadDonorMap';
@@ -166,7 +166,7 @@ const CreateRequestPage = () => {
   if (successData) {
     return (
       <div className="flex justify-center items-center py-12 px-2 sm:px-4">
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="card w-full max-w-3xl bg-base-100 shadow-2xl shadow-base-content/5 border border-base-300 rounded-3xl overflow-hidden"
@@ -247,14 +247,14 @@ const CreateRequestPage = () => {
               </Link>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       </div>
     );
   }
 
   return (
     <div className="flex justify-center items-center py-12 px-4">
-      <motion.div 
+      <m.div 
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
@@ -262,7 +262,7 @@ const CreateRequestPage = () => {
       >
         <div className="card-body p-8 sm:p-10">
           {/* Header */}
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4 }}
@@ -275,7 +275,7 @@ const CreateRequestPage = () => {
             <p className="text-base-content/70 mt-3 font-normal text-sm max-w-sm mx-auto leading-relaxed">
               Create an emergency broadcast. We'll notify compatible donors within a 15km radius immediately.
             </p>
-          </motion.div>
+          </m.div>
 
           {isPostingAgain && (
             <div className="mb-6 bg-info/10 border border-info/20 rounded-2xl p-4 text-sm font-medium text-base-content flex items-start gap-3">
@@ -287,7 +287,7 @@ const CreateRequestPage = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
 
             {/* Hospital: found by search, or the device's position as a backup */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(0)}
@@ -300,10 +300,10 @@ const CreateRequestPage = () => {
                 error={errors.hospitalLocation}
                 disabled={loading}
               />
-            </motion.div>
+            </m.div>
 
             {/* Hospital Name */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(1)}
@@ -331,24 +331,24 @@ const CreateRequestPage = () => {
                 />
               </div>
               {errors.hospitalName ? (
-                <motion.span 
+                <m.span 
                   id="hospital-name-error"
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.hospitalName}
-                </motion.span>
+                </m.span>
               ) : (
                 <span id="hospital-name-help" className="block text-base-content/60 text-xs mt-1.5 ml-1">
                   Filled in when you choose a search result. You can change it, for example to add the ward.
                 </span>
               )}
-            </motion.div>
+            </m.div>
             
             <div className="grid grid-cols-2 gap-4">
               {/* Blood Group */}
-              <motion.div 
+              <m.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={fieldDelay(2)}
@@ -375,18 +375,18 @@ const CreateRequestPage = () => {
                   </select>
                 </div>
                 {errors.bloodGroup && (
-                  <motion.span 
+                  <m.span 
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-error text-sm mt-1.5 ml-1 font-medium"
                   >
                     {errors.bloodGroup}
-                  </motion.span>
+                  </m.span>
                 )}
-              </motion.div>
+              </m.div>
 
               {/* Units */}
-              <motion.div 
+              <m.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={fieldDelay(3)}
@@ -407,19 +407,19 @@ const CreateRequestPage = () => {
                   }}
                 />
                 {errors.unitsNeeded && (
-                  <motion.span 
+                  <m.span 
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-error text-sm mt-1.5 ml-1 font-medium"
                   >
                     {errors.unitsNeeded}
-                  </motion.span>
+                  </m.span>
                 )}
-              </motion.div>
+              </m.div>
             </div>
 
             {/* Urgency */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(4)}
@@ -439,10 +439,10 @@ const CreateRequestPage = () => {
                   </option>
                 ))}
               </select>
-            </motion.div>
+            </m.div>
 
             {/* Submit */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(5)}
@@ -451,10 +451,10 @@ const CreateRequestPage = () => {
               <button type="submit" className="btn btn-primary w-full rounded-xl text-primary-content font-bold shadow-lg shadow-primary/20 border-none min-h-14 h-auto py-2 leading-tight text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Broadcast Emergency Request'}
               </button>
-            </motion.div>
+            </m.div>
           </form>
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 };

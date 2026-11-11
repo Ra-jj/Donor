@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { MapPinIcon, UserIcon, EnvelopeSimpleIcon, LockIcon, DropIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
@@ -168,7 +168,7 @@ const RegisterPage = () => {
 
   return (
     <div className="flex justify-center items-center py-12 px-4">
-      <motion.div 
+      <m.div 
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
@@ -176,7 +176,7 @@ const RegisterPage = () => {
       >
         <div className="card-body p-8 sm:p-10">
           {/* Header */}
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4 }}
@@ -187,11 +187,11 @@ const RegisterPage = () => {
             </div>
             <h2 className="text-3xl font-display font-extrabold text-base-content tracking-tight">Create Account</h2>
             <p className="text-base-content/70 mt-2 font-normal text-sm">Join Donor and start saving lives</p>
-          </motion.div>
+          </m.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(0)}
@@ -215,18 +215,18 @@ const RegisterPage = () => {
                 />
               </div>
               {errors.name && (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.name}
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Email */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(1)}
@@ -252,18 +252,18 @@ const RegisterPage = () => {
                 />
               </div>
               {errors.email && (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.email}
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Password */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(2)}
@@ -295,20 +295,20 @@ const RegisterPage = () => {
                 </button>
               </div>
               {errors.password ? (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.password}
-                </motion.span>
+                </m.span>
               ) : (
                 <span className="text-base-content/70 text-xs mt-1.5 ml-1">At least 6 characters</span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Blood Group */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(3)}
@@ -335,18 +335,18 @@ const RegisterPage = () => {
                 </select>
               </div>
               {errors.bloodGroup && (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 ml-1 font-medium"
                 >
                   {errors.bloodGroup}
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Location */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(4)}
@@ -414,26 +414,26 @@ const RegisterPage = () => {
                 </p>
               </div>
               {formData.location ? (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-xs font-semibold text-success-strong mt-3 text-center"
                 >
                   Coordinates: {formData.location[0].toFixed(4)}, {formData.location[1].toFixed(4)}
-                </motion.span>
+                </m.span>
               ) : errors.location && (
-                <motion.span 
+                <m.span 
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-error text-sm mt-1.5 text-center font-medium"
                 >
                   {errors.location}
-                </motion.span>
+                </m.span>
               )}
-            </motion.div>
+            </m.div>
 
             {/* Privacy summary and the two agreements, above the button that creates the account */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(5)}
@@ -446,10 +446,10 @@ const RegisterPage = () => {
                 errors={errors}
                 onChange={handleConsentChange}
               />
-            </motion.div>
+            </m.div>
 
             {/* Submit */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={fieldDelay(6)}
@@ -458,10 +458,10 @@ const RegisterPage = () => {
               <button type="submit" className="btn btn-primary w-full rounded-xl text-primary-content font-bold shadow-lg shadow-primary/20 border-none h-14 text-lg active:scale-98 transition-transform" disabled={loading}>
                 {loading ? <span className="loading loading-spinner"></span> : 'Create Account'}
               </button>
-            </motion.div>
+            </m.div>
           </form>
 
-          <motion.div 
+          <m.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.65, duration: 0.4 }}
@@ -471,9 +471,9 @@ const RegisterPage = () => {
               Already have an account?{' '}
               <Link to="/login" className="text-primary font-bold hover:underline">Log in</Link>
             </p>
-          </motion.div>
+          </m.div>
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 };

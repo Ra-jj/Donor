@@ -39,7 +39,9 @@ const checkForUpdate = (registration) => {
   registration.update().catch((error) => console.warn('Service worker update check failed:', error));
 };
 
-export const registerServiceWorker = () => {
+// main.jsx calls this at startup. The browser itself checks for a new sw.js when a page of the app
+// is opened, so a new build can take over before registerServiceWorker below has run.
+export const watchForNewBuilds = () => {
   if (!('serviceWorker' in navigator)) return;
 
   // The first install also changes the controller (from none, through clients.claim() in sw.js),
@@ -57,6 +59,16 @@ export const registerServiceWorker = () => {
   document.addEventListener('click', markPageUsed, { capture: true, passive: true });
   document.addEventListener('input', markPageUsed, { capture: true, passive: true });
   document.addEventListener('visibilitychange', reloadIfInBackgroundAndUnused);
+};
+
+let hasRegistrationStarted = false;
+
+// App calls this once the first page is on screen and the browser is idle. Installing the worker
+// downloads every file of the app for its precache, which on a first visit over a slow connection
+// would otherwise share the network with the first page's own files and data.
+export const registerServiceWorker = () => {
+  if (!('serviceWorker' in navigator) || hasRegistrationStarted) return;
+  hasRegistrationStarted = true;
 
   registerSW({
     immediate: true,

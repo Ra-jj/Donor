@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { axiosInstance } from '../lib/axios';
-import { initSocket, disconnectSocket } from '../lib/socket';
 import { clearLoginPageMessage, showOnLoginPage } from '../lib/loginPageMessage';
 import { clearShareTokenCache } from '../lib/shareTokenCache';
 import toast from 'react-hot-toast';
@@ -23,16 +22,50 @@ const describePrivacyConsentError = (error) => {
   return data?.message || `Your answer couldn't be saved (HTTP ${status}). Please try again.`;
 };
 
+// lib/socket.js brings in socket.io-client, which only a signed-in user needs, so it is loaded the
+// first time a user signs in, in a chunk of its own, instead of with every first visit. The pages
+// that use the socket import lib/socket.js too, so it usually downloads along with them.
+let socketModule = null;
+let socketModulePromise = null;
+const loadSocketModule = () => {
+  if (!socketModulePromise) {
+    socketModulePromise = import('../lib/socket').then(
+      (module) => {
+        socketModule = module;
+        return module;
+      },
+      (error) => {
+        // Not kept, so the next sign-in or page load tries again
+        socketModulePromise = null;
+        throw error;
+      },
+    );
+  }
+  return socketModulePromise;
+};
+
+// Only lib/socket.js opens sockets, so before it has loaded there is none to close
+const disconnectSocket = () => {
+  socketModule?.disconnectSocket();
+};
+
 // A user who has not agreed to the current Privacy Notice sees only the consent screen (App.jsx),
-// which needs no live events, so their socket waits until they agree (acceptPrivacyNotice). Call
-// before authUser changes, so pages rendered for this user subscribe to this user's socket.
-// initSocket reuses a live socket only if it was opened for this same user.
-const connectSocketIfConsented = (user) => {
+// which needs no live events, so their socket waits until they agree (acceptPrivacyNotice). Await
+// it before authUser changes, so pages rendered for this user subscribe to this user's socket.
+// initSocket reuses a live socket only if it was opened for this same user. If lib/socket.js
+// fails to load, the user is still signed in, with no live updates: the pages that use the socket
+// import that same chunk, so they fail to load too, and RouteErrorBoundary handles that.
+const connectSocketIfConsented = async (user) => {
   if (user.needsPrivacyConsent) {
     disconnectSocket();
     return;
   }
-  initSocket(user._id);
+  try {
+    const { initSocket } = await loadSocketModule();
+    initSocket(user._id);
+  } catch (error) {
+    console.error('Could not load the live updates code:', error);
+  }
 };
 
 // Every window of this browser shares one jwt cookie, so a deletion signs all of them out, but
@@ -52,12 +85,16 @@ const announceAccountDeleted = () => {
 export const useAuthStore = create((set, get) => ({
   authUser: null,
   isCheckingAuth: true,
+  // The user /auth/check answered with, only while checkAuth then waits for their socket code: App
+  // starts downloading the page this user will see meanwhile, instead of after it. null otherwise.
+  checkedUser: null,
 
   checkAuth: async () => {
     try {
       const res = await axiosInstance.get('/auth/check');
+      set({ checkedUser: res.data.user });
       // Socket first, so components rendered for this user subscribe to this user's socket
-      connectSocketIfConsented(res.data.user);
+      await connectSocketIfConsented(res.data.user);
       set({ authUser: res.data.user });
       clearLoginPageMessage();
     } catch (error) {
@@ -67,7 +104,7 @@ export const useAuthStore = create((set, get) => ({
       }
       set({ authUser: null });
     } finally {
-      set({ isCheckingAuth: false });
+      set({ isCheckingAuth: false, checkedUser: null });
     }
   },
 
@@ -76,7 +113,7 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post('/auth/register', data);
       // The server just set a new jwt cookie, so always open a new socket authenticated by it
       disconnectSocket();
-      connectSocketIfConsented(res.data.user);
+      await connectSocketIfConsented(res.data.user);
       set({ authUser: res.data.user });
       clearLoginPageMessage();
       toast.success('Account created successfully');
@@ -95,7 +132,7 @@ export const useAuthStore = create((set, get) => ({
       const res = await axiosInstance.post('/auth/login', data);
       // The server just set a new jwt cookie, so always open a new socket authenticated by it
       disconnectSocket();
-      connectSocketIfConsented(res.data.user);
+      await connectSocketIfConsented(res.data.user);
       set({ authUser: res.data.user });
       clearLoginPageMessage();
       toast.success('Logged in successfully');
@@ -119,7 +156,13 @@ export const useAuthStore = create((set, get) => ({
   acceptPrivacyNotice: async ({ acceptPrivacy, confirmAdult }) => {
     try {
       const res = await axiosInstance.post('/users/privacy-consent', { acceptPrivacy, confirmAdult });
-      connectSocketIfConsented(res.data.user);
+      await connectSocketIfConsented(res.data.user);
+      // Signed out while that loaded (Log out, or another window deleted the account): stay signed
+      // out, and close the socket just opened. The consent screen then goes to /login, as for a 401.
+      if (!get().authUser) {
+        disconnectSocket();
+        return { success: false, signedOut: true };
+      }
       set({ authUser: res.data.user });
       return { success: true };
     } catch (error) {

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { DropIcon, SignOutIcon, ListIcon, XIcon, SunIcon, MoonIcon } from '@phosphor-icons/react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useThemeStore } from '../store/useThemeStore';
-import { motion, AnimatePresence } from 'motion/react';
+import { m, AnimatePresence } from 'motion/react';
 
 // The account menu's items show keyboard focus with the red edge used everywhere else: daisyUI
 // gives them only a 10% grey fill, 1.22:1 (light) and 1.31:1 (dark) against the menu
@@ -86,7 +86,7 @@ const Navbar = () => {
                   aria-label="Toggle theme"
                 >
                   <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
+                    <m.div
                       key={theme}
                       initial={{ y: -16, opacity: 0, rotate: -90 }}
                       animate={{ y: 0, opacity: 1, rotate: 0 }}
@@ -98,7 +98,7 @@ const Navbar = () => {
                       ) : (
                         <SunIcon weight="duotone" className="w-5 h-5" />
                       )}
-                    </motion.div>
+                    </m.div>
                   </AnimatePresence>
                 </button>
               </>
@@ -111,7 +111,7 @@ const Navbar = () => {
                   aria-label="Toggle theme"
                 >
                   <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
+                    <m.div
                       key={theme}
                       initial={{ y: -16, opacity: 0, rotate: -90 }}
                       animate={{ y: 0, opacity: 1, rotate: 0 }}
@@ -123,7 +123,7 @@ const Navbar = () => {
                       ) : (
                         <SunIcon weight="duotone" className="w-5 h-5" />
                       )}
-                    </motion.div>
+                    </m.div>
                   </AnimatePresence>
                 </button>
                 <Link to="/login" className="btn btn-ghost rounded-full px-6 font-semibold active:scale-95 transition-transform min-h-11">Log in</Link>
@@ -146,14 +146,14 @@ const Navbar = () => {
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-base-content/20 backdrop-blur-sm z-50 md:hidden"
               onClick={() => setMobileMenuLocation(null)}
             />
-            <motion.div
+            <m.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
@@ -210,7 +210,7 @@ const Navbar = () => {
                   </>
                 )}
               </div>
-            </motion.div>
+            </m.div>
           </>
         )}
       </AnimatePresence>

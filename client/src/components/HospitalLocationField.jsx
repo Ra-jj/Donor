@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import toast from 'react-hot-toast';
 import { CheckCircleIcon, HospitalIcon, MagnifyingGlassIcon, MapPinIcon } from '@phosphor-icons/react';
 import MapErrorBoundary from './MapErrorBoundary';
@@ -271,7 +271,7 @@ const HospitalLocationField = ({ location, onPlacePicked, onLocationChange, erro
       </p>
 
       {location && (
-        <motion.div
+        <m.div
           ref={confirmationRef}
           tabIndex={-1}
           initial={{ opacity: 0, y: -4 }}
@@ -309,7 +309,7 @@ const HospitalLocationField = ({ location, onPlacePicked, onLocationChange, erro
               />
             </Suspense>
           </MapErrorBoundary>
-        </motion.div>
+        </m.div>
       )}
 
       <div className="divider text-xs text-base-content/70 my-2">or</div>
