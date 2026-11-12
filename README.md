@@ -12,7 +12,11 @@ A real-time web application designed to connect people in need of critical suppl
 - **Minimum Gap Between Donations:** Donors who gave whole blood in the last 120 days (India's G.S.R. 166(E)) are not alerted and cannot accept a request. Donations through Donor are counted automatically, and donors can add one made elsewhere.
 - **Coordination Chat:** Real-time messaging between the requester and the matched donor while a request is accepted.
 - **Fulfillment & Ratings Lifecycle:** Requesters mark an accepted request as fulfilled once the donation is done, and can rate the donor from 1 to 5 stars.
-- **User Profiles & History:** Users can see their impact stats (donations, average rating) and their past requests and donations.
+- **Share Links:** A requester can share an open request (WhatsApp, the phone's share menu, or copy) as an unguessable `/r/<link>` that anyone can open without an account. The page shows only the blood group, units, hospital and urgency while the request is open, then just "donor found" or "closed", and never anything about the requester. Search engines are told not to index it.
+- **Request Expiry & Post Again:** A request nobody accepts closes after 48 hours. The requester can "Post again", which opens the New Request form filled in with the same details for them to check and send.
+- **Donation Reminder:** One push alert when a donor can give blood again after the 120-day gap, sent between 8 am and 9 pm India time and only to donors with "Available to donate" switched on.
+- **User Profiles & History:** Users can see their impact stats (donations, average rating), badges at 1, 3, 5 and 10 donations made through Donor, and their past requests and donations.
+- **Home Page Totals:** The home page shows how many donations have been completed and how many people have joined, counted at most every 10 minutes.
 - **Report & Block:** Donors can report a fake or abusive request, and the requester and matched donor can report each other. A pending request reported by 3 different users whose accounts are older than it closes on its own; reports are only stored, for the owner to review in the database, and nobody is told who reported them. Anyone can block the other person on a request or in a chat: the two are never matched again in either direction (no alerts, no listings, no accepts), a match between them ends, and the blocked person isn't told. Blocks are listed in Profile, with Unblock.
 - **Account Deletion:** Users can delete their account from Profile, confirmed with their password. The deletion happens at once, in a single transaction. Finished donations stay in the other person's history as "Deleted user"; everything else is erased, and every other session is signed out.
 - **Privacy Notice & Consent:** A plain-language notice at `/privacy`, written to India's DPDP Act 2023 / DPDP Rules 2025. Sign-up has separate, unticked "I agree" and "I am 18 or older" checkboxes. Users who agreed to an older version are asked again, and every agreement is recorded with its version and time.
@@ -128,7 +132,7 @@ npm test
 See `e2e/README.md` for details.
 
 ### 5. Continuous Integration
-`.github/workflows/ci.yml` runs the server tests, the client lint + build and the browser tests on every pull request and every push to `main`. The `main` branch only accepts changes through pull requests that pass the required checks. Dependabot opens monthly dependency update PRs, which go through the same checks.
+`.github/workflows/ci.yml` runs the server tests, the client lint + build and the browser tests on every pull request and every push to `main`. The `main` branch only accepts changes through pull requests that pass the required checks ("Server tests", "Client build" and "Browser tests", set in the "Protect main" ruleset). Dependabot opens monthly dependency update PRs, which go through the same checks.
 
 ## 🌍 Production Deployment
 This application is configured for a single-service full-stack deployment on platforms like Render.
