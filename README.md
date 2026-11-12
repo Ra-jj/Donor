@@ -101,7 +101,7 @@ npm run dev
 - The backend API will start on `http://localhost:8000`
 
 ### 4. Run Tests
-The backend has about 440 Jest + Supertest tests, which run against an in-memory MongoDB replica set (so transactions work). They cover:
+The backend has 508 Jest + Supertest tests, which run against an in-memory MongoDB replica set (so transactions work). They cover:
 - authentication and rate limits;
 - blood compatibility and the request lifecycle (including races between accept, cancel and fulfil);
 - the 120-day donation gap;
@@ -119,8 +119,16 @@ npm test
 
 The client is checked with `npm run lint -- --deny-warnings` and `npm run build` (from `client/`).
 
+Browser tests (Playwright, Chromium) in `e2e/` run the built client against the real server in production mode on an in-memory MongoDB: sign-up and login, live updates between two users (new request, accept, chat, fulfil, rating), shared links, the consent screen, offline and blocking. With the server installed and the client built:
+```bash
+cd e2e
+npm ci
+npm test
+```
+See `e2e/README.md` for details.
+
 ### 5. Continuous Integration
-`.github/workflows/ci.yml` runs the server tests and the client lint + build on every pull request and every push to `main`. The `main` branch only accepts changes through pull requests that pass both checks. Dependabot opens monthly dependency update PRs, which go through the same checks.
+`.github/workflows/ci.yml` runs the server tests, the client lint + build and the browser tests on every pull request and every push to `main`. The `main` branch only accepts changes through pull requests that pass the required checks. Dependabot opens monthly dependency update PRs, which go through the same checks.
 
 ## 🌍 Production Deployment
 This application is configured for a single-service full-stack deployment on platforms like Render.
