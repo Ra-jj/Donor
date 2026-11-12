@@ -1,0 +1,14 @@
+{
+  "name": "donor-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser tests of the built client and the real server on an in-memory MongoDB",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
